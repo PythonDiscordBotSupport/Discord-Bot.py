@@ -17,8 +17,8 @@ tracker = 1500591520846450851
 # Voice Channels IDs
 division_name = ""
 division_leader = ""
-division_level = ""
-division_exp = ""
+division_level = 1507852141954469928
+division_exp = 1507851170448806129
 server_members = ""
 group_members = ""
 hicom_members = ""

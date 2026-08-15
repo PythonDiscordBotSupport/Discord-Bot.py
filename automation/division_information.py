@@ -45,4 +45,9 @@ async def update_division_stats(bot: commands.Bot):
 
     except Exception as e:
         print(f"[Division Info] Ошибка при обновлении статистики: {e}")
-        
+
+
+# Позволяет discord.py распознать этот файл как полноценный загруженный модуль
+async def setup(bot: commands.Bot):
+    pass
+    

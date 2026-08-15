@@ -1,9 +1,9 @@
 import os
 # Environment
-bot_token = ""
-cloud_api = ""
-sheets_service_account = ""
-restart_token = ""
+bot_token = os.environ.get("")
+cloud_api = os.environ.get("")
+sheets_service_account = os.environ.get("")
+restart_token = os.environ.get("")
 # Permissions
 division_administrator = ""
 head_moderator = ""
@@ -24,3 +24,6 @@ group_members = ""
 hicom_members = ""
 officer_members = ""
 enlisted_members = ""
+# Group Information
+group_id = ""
+newbie_role_id = ""

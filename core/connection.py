@@ -12,9 +12,11 @@ failed_modules = []
 
 
 async def load_extensions():
-    folders = ["discord_commands", "roblox_commands"]
+    # Список папок в корне проекта
+    folders = ["discord_commands", "roblox_commands", "automation"]
 
     for folder in folders:
+        # Проверяем наличие папки от корня проекта
         if os.path.exists(folder):
             for filename in os.listdir(folder):
                 if filename.endswith(".py") and not filename.startswith("_"):
@@ -89,7 +91,4 @@ async def on_ready():
 
 def start_bot():
     bot.run(bot_token)
-
-
-if __name__ == "__main__":
-    start_bot()
+    

@@ -54,7 +54,7 @@ async def on_ready():
         if notif_channel:
             embed_status = discord.Embed(
                 title="🟢 System Status",
-                description=f"Bot **{bot.user.name}** has been successfully launched and is ready!",
+                description=f"Bot **{bot.user.name}** has been successfully launched and ready!",
                 color=discord.Color.green(),
             )
             embed_status.set_footer(text=f"Launch time: {current_time}")

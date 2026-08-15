@@ -1,19 +1,19 @@
 import os
 # Environment
-bot_token = os.environ.get("")
-cloud_api = os.environ.get("")
-sheets_service_account = os.environ.get("")
-restart_token = os.environ.get("")
+bot_token = os.environ.get("bot_token")
+cloud_api = os.environ.get("cloud_api")
+sheets_service_account = os.environ.get("service_account")
+restart_token = os.environ.get("restart_token")
 # Permissions
 division_administrator = ""
 head_moderator = ""
 moderator = ""
 human_resources = ""
 # Channels IDs
-notifications = ""
-errors = ""
-progression = ""
-tracker = ""
+notifications = 1507853423117336691
+errors = 1500591818532978909
+progression = 1500590900902887575
+tracker = 1500591520846450851
 # Voice Channels IDs
 division_name = ""
 division_leader = ""

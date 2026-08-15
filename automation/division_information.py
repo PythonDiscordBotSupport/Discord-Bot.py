@@ -18,9 +18,12 @@ async def update_division_stats(bot: commands.Bot):
             print(f"[Division Info] Ничего не найдено по запросу: '{target}'")
             return
 
+        # Извлечение только цифр из столбцов B и D
         val_b_raw = str(match.iloc[0, 1])
         val_b = "".join(filter(str.isdigit, val_b_raw))
-        val_d = str(match.iloc[0, 3]).strip()
+
+        val_d_raw = str(match.iloc[0, 3])
+        val_d = "".join(filter(str.isdigit, val_d_raw))
 
         level_name = f"🆙┆Division Level: {val_b}"
         exp_name = f"✨┆Division Experiences: {val_d}"

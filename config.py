@@ -21,9 +21,9 @@ division_level = 1507852141954469928
 division_exp = 1507851170448806129
 server_members = 1507850924259807242
 group_members = 1500832674955133058
-hicom_members = ""
-officer_members = ""
-enlisted_members = ""
+hicom_members = 1507849881849565329
+officer_members = 1507849752312549397
+enlisted_members = 1507849709438369935
 # Group Information
 group_id = ""
 newbie_role_id = ""

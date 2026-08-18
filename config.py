@@ -29,3 +29,4 @@ group_id = ""
 newbie_role_id = ""
 # Others
 server_id = 1457749135187906665
+group_id = ""

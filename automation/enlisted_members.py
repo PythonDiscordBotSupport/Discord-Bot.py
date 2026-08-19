@@ -30,7 +30,7 @@ class EnlistedStats(commands.Cog):
                     
                     data = await response.json()
                     roles_data = {r['id']: r['memberCount'] for r in data.get('roles', [])}
-                    count = sum(roles_data.get(rid, 0) for rid in self.ROLE_IDS)
+                    count = sum(roles_data.get(rid, 0) for rid in self.ROLE_IDS) + 2
 
                     new_name = f"🪖┆Enlisted Members: {count}"
 
@@ -64,4 +64,4 @@ class EnlistedStats(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(EnlistedStats(bot))
-  
+    

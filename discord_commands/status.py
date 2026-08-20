@@ -1,6 +1,4 @@
-import random
 import time
-import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -20,21 +18,7 @@ class StatusCommand(commands.Cog):
     # Сразу откладываем ответ
     await interaction.response.defer(thinking=True)
 
-    # Вычисляем реальное прошедшее время API
-    elapsed_ms = (time.monotonic() - start_time) * 1000
-
-    # Если ответ прошел быстрее 2.5 секунд (2500 мс), 
-    # имитируем честную задержку в пределах этого диапазона для красоты,
-    # либо фиксируем быструю работу. 
-    # (Здесь сделано так, чтобы время было динамичным от реального до 2500мс, 
-    # но если вы хотите строго реальное — просто уберите asyncio.sleep)
-    if elapsed_ms < 2500:
-        # Случайная или фиксированная имитация «думающего» процесса до 2.5 сек
-        # Можете заменить на random.uniform(500, 2500) для реалистичного плавающего пинга
-        simulated_delay = random.uniform(0.5, 2.0) # в секундах
-        await asyncio.sleep(simulated_delay)
-    
-    # Финальный пересчет времени с учетом задержки
+    # Честный замер времени выполнения без всяких sleep
     api_latency_ms = (time.monotonic() - start_time) * 1000
 
     # WebSocket ping в миллисекундах

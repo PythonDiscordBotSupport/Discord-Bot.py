@@ -13,7 +13,6 @@ human_resources = ""
 notifications = 1507853423117336691
 errors = 1500591818532978909
 progression = 1500590900902887575
-tracker = 1500591520846450851
 # Voice Channels IDs
 division_name = ""
 division_leader = ""
@@ -25,8 +24,6 @@ hicom_members = 1507849881849565329
 officer_members = 1507849752312549397
 enlisted_members = 1507849709438369935
 # Group Information
-group_id = ""
-newbie_role_id = ""
+group_id = 14543769
 # Others
 server_id = 1457749135187906665
-group_id = 14543769

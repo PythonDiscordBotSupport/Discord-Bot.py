@@ -35,9 +35,13 @@ async def load_extensions():
 @bot.event
 async def setup_hook():
     await load_extensions()
-    # 2. tree.sync() лучше вызывать вручную через команду администратора, 
-    # либо раскомментировать ТОЛЬКО для однократной синхронизации:
-    # await bot.tree.sync() 
+    
+    # Синхронизируем слеш-команды с Discord
+    try:
+        synced = await bot.tree.sync()
+        print(f"Successfully synced {len(synced)} command(s).")
+    except Exception as e:
+        print(f"Failed to sync commands: {e}")
 
 
 @bot.event

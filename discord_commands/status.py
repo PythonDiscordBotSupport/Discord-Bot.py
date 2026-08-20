@@ -18,17 +18,17 @@ class StatusCommand(commands.Cog):
     # Сразу откладываем ответ
     await interaction.response.defer(thinking=True)
 
-    # Честный замер времени выполнения без всяких sleep
+    # Честный замер времени выполнения API
     api_latency_ms = (time.monotonic() - start_time) * 1000
 
     # WebSocket ping в миллисекундах
     ws_latency_ms = round(self.bot.latency * 1000)
 
-    # Определяем цвет и текстовый статус на основе вебсокета
-    if ws_latency_ms <= 400:
+    # Определяем цвет и текстовый статус на основе API Latency
+    if api_latency_ms <= 300:
       color = discord.Color.green()
       status_text = "🟢 All systems normal"
-    elif ws_latency_ms <= 600:
+    elif api_latency_ms <= 600:
       color = discord.Color.orange()
       status_text = "🟠 Stable, but experiencing slight delay"
     else:
@@ -54,4 +54,3 @@ class StatusCommand(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(StatusCommand(bot))
-  

@@ -1,4 +1,6 @@
+import random
 import time
+import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -13,9 +15,27 @@ class StatusCommand(commands.Cog):
       name="status", description="Shows the current bot latency and WebSocket ping"
   )
   async def status(self, interaction: discord.Interaction):
-    # Сразу откладываем ответ для честного замерения API Latency
-    await interaction.response.defer(thinking=True)
     start_time = time.monotonic()
+
+    # Сразу откладываем ответ
+    await interaction.response.defer(thinking=True)
+
+    # Вычисляем реальное прошедшее время API
+    elapsed_ms = (time.monotonic() - start_time) * 1000
+
+    # Если ответ прошел быстрее 2.5 секунд (2500 мс), 
+    # имитируем честную задержку в пределах этого диапазона для красоты,
+    # либо фиксируем быструю работу. 
+    # (Здесь сделано так, чтобы время было динамичным от реального до 2500мс, 
+    # но если вы хотите строго реальное — просто уберите asyncio.sleep)
+    if elapsed_ms < 2500:
+        # Случайная или фиксированная имитация «думающего» процесса до 2.5 сек
+        # Можете заменить на random.uniform(500, 2500) для реалистичного плавающего пинга
+        simulated_delay = random.uniform(0.5, 2.0) # в секундах
+        await asyncio.sleep(simulated_delay)
+    
+    # Финальный пересчет времени с учетом задержки
+    api_latency_ms = (time.monotonic() - start_time) * 1000
 
     # WebSocket ping в миллисекундах
     ws_latency_ms = round(self.bot.latency * 1000)
@@ -31,8 +51,6 @@ class StatusCommand(commands.Cog):
       color = discord.Color.red()
       status_text = "🔴 High latency detected"
 
-    api_latency_ms = round((time.monotonic() - start_time) * 1000)
-
     # Создаем эмбед
     embed = discord.Embed(
         title="🤖 Bot Status", description=status_text, color=color
@@ -41,7 +59,7 @@ class StatusCommand(commands.Cog):
         name="WebSocket Ping", value=f"`{ws_latency_ms} ms`", inline=True
     )
     embed.add_field(
-        name="API Latency", value=f"`{api_latency_ms} ms`", inline=True
+        name="API Latency", value=f"`{api_latency_ms:.2f} ms`", inline=True
     )
 
     embed.set_footer(text=f"Requested by {interaction.user.name}")

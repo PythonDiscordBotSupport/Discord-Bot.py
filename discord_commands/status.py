@@ -13,6 +13,8 @@ class StatusCommand(commands.Cog):
       name="status", description="Shows the current bot latency and WebSocket ping"
   )
   async def status(self, interaction: discord.Interaction):
+    # Сразу откладываем ответ для честного замерения API Latency
+    await interaction.response.defer(thinking=True)
     start_time = time.monotonic()
 
     # WebSocket ping в миллисекундах
@@ -28,9 +30,6 @@ class StatusCommand(commands.Cog):
     else:
       color = discord.Color.red()
       status_text = "🔴 High latency detected"
-
-    # Откладываем ответ для честного замерения API Latency
-    await interaction.response.defer(thinking=True)
 
     api_latency_ms = round((time.monotonic() - start_time) * 1000)
 

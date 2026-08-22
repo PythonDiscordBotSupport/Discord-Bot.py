@@ -1,9 +1,9 @@
+import datetime
 import time
 import discord
 from discord import app_commands
 from discord.ext import commands
 import psutil
-import datetime
 
 
 class StatusCommand(commands.Cog):
@@ -29,9 +29,9 @@ class StatusCommand(commands.Cog):
     api_latency_ms = (time.monotonic() - start_time) * 1000
     ws_latency_ms = round(self.bot.latency * 1000)
 
-    # 2. Сбор системных метрик через psutil (для Server Maintenance)
+    # 2. Сбор системных метрик через psutil
     cpu_usage = psutil.cpu_percent(interval=None)
-    
+
     # Память хоста
     mem = psutil.virtual_memory()
     ram_total_mb = round(mem.total / (1024 * 1024))
@@ -39,7 +39,7 @@ class StatusCommand(commands.Cog):
     ram_percent = mem.percent
 
     # Диск хоста
-    disk = psutil.disk_usage('/')
+    disk = psutil.disk_usage("/")
     disk_total_gb = round(disk.total / (1024 * 1024 * 1024), 1)
     disk_free_gb = round(disk.free / (1024 * 1024 * 1024), 1)
     disk_percent = disk.percent
@@ -59,41 +59,46 @@ class StatusCommand(commands.Cog):
       color = discord.Color.red()
       status_text = "🔴 High latency detected"
 
-    # Создаем эмбед
-    embed = discord.Embed(
-        title="🤖 Bot & Server Status", description=status_text, color=color
+    # --- ЭМБЕД 1: Discord Bot & API ---
+    embed_bot = discord.Embed(
+        title="⚡ Discord API & WS",
+        description=(
+            f"**Status:** {status_text}\n"
+            f"• **WebSocket:** `{ws_latency_ms} ms`\n"
+            f"• **API Latency:** `{api_latency_ms:.2f} ms`"
+        ),
+        color=color,
     )
 
-    # Поле: Discord Bot / API
-    embed.add_field(
-        name="⚡ Discord API & WS",
-        value=f"WebSocket: `{ws_latency_ms} ms`\nAPI: `{api_latency_ms:.2f} ms`",
-        inline=False,
+    # --- ЭМБЕД 2: Roblox Open Cloud ---
+    embed_roblox = discord.Embed(
+        title="🎮 Roblox Open Cloud",
+        description=(
+            "🟢 **Webhook Active**\n"
+            "*Awaiting data streams from game servers...*"
+        ),
+        color=discord.Color.blue(),
     )
 
-    # Поле: Roblox Open Cloud (заглушка под вебхук, как вы просили)
-    embed.add_field(
-        name="🎮 Roblox Open Cloud",
-        value="🟢 Webhook Active\n*(Awaiting data streams)*",
-        inline=False,
-    )
-
-    # Поле: Server Maintenance (реальные метрики хоста)
-    embed.add_field(
-        name="🛠️ Server Maintenance",
-        value=(
+    # --- ЭМБЕД 3: Server Maintenance ---
+    embed_server = discord.Embed(
+        title="🛠️ Server Maintenance",
+        description=(
             f"💻 **CPU Usage:** `{cpu_usage}%`\n"
             f"🧠 **RAM:** `{ram_used_mb} MB / {ram_total_mb} MB` (`{ram_percent}%`)\n"
             f"💾 **Disk Free:** `{disk_free_gb} GB / {disk_total_gb} GB` (`{disk_percent}%` used)\n"
             f"⏳ **Uptime:** `{uptime_str}`"
         ),
-        inline=False,
+        color=discord.Color.dark_grey(),
     )
 
-    embed.set_footer(text=f"Requested by {interaction.user.name}")
+    # Устанавливаем футер для последнего эмбеда или для всех по вкусу
+    embed_server.set_footer(text=f"Requested by {interaction.user.name}")
 
-    # Отправляем готовый результат
-    await interaction.followup.send(embed=embed)
+    # Отправляем все три эмбеда отдельными аккуратными блоками в одном ответе
+    await interaction.followup.send(
+        embeds=[embed_bot, embed_roblox, embed_server]
+    )
 
 
 async def setup(bot: commands.Bot):

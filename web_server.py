@@ -5,7 +5,6 @@ import os
 
 app = Flask('')
 
-# Словарь для хранения времени последнего запроса от IP
 request_limits = {}
 TIME_WINDOW = 10  # секунд
 
@@ -17,14 +16,14 @@ def home():
     if client_ip in request_limits:
         elapsed_time = current_time - request_limits[client_ip]
         if elapsed_time < TIME_WINDOW:
-            # ТУПО ИГНОРИРУЕМ: заставляем поток "спать" и ничего не возвращаем
-            # Или возвращаем пустой ответ с обрывом (например, код 444, который Nginx/Flask воспринимает как сброс)
-            time.sleep(1) # Защита от моментального заспама процессора
-            return "", 444
+            # 🛡️ СИМУЛЯЦИЯ «ЧЕРНОЙ ДЫРЫ»:
+            # Мы не шлем быстрый ответ 429. Мы заставляем поток "уснуть".
+            # Спамер будет висеть на этом запросе до таймаута (в его же скрипте вылетит asyncio.TimeoutError),
+            # а ваш сервер не будет тратить процессор на генерацию текстов.
+            time.sleep(3) 
+            return "", 444 # Обрыв соединения
 
-    # Обновляем время последнего запроса
     request_limits[client_ip] = current_time
-    
     return "Bot is running!", 200
 
 def run():

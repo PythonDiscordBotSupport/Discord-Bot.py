@@ -7,7 +7,7 @@ app = Flask('')
 
 # Словарь для хранения времени последнего запроса от IP: { "127.0.0.1": 1718000000.0 }
 request_limits = {}
-TIME_WINDOW = 10  секунд
+TIME_WINDOW = 10 # секунд
 
 @app.route('/')
 def home():

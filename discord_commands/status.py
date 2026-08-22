@@ -31,12 +31,14 @@ class StatusCommand(commands.Cog):
     ws_latency_ms = round(self.bot.latency * 1000)
 
     # 2. Метрики процесса бота
-    cpu_usage = self.process.cpu_percent(interval=None)
-    
+    raw_cpu_usage = self.process.cpu_percent(interval=None)
+    # Умножаем на 10, так как наш лимит — 0.1 vCPU (10% от ядра хоста)
+    cpu_usage = round(raw_cpu_usage * 10, 1)
+
     mem_info = self.process.memory_info()
     bot_ram_mb = round(mem_info.rss / (1024 * 1024), 2)
     
-    # Считаем процент RAM строго относительно вашего лимита контейнера (512 МБ)
+    # Считаем процент RAM относительно вашего лимита контейнера (512 МБ)
     container_ram_limit_mb = 512
     ram_percent = round((bot_ram_mb / container_ram_limit_mb) * 100, 1)
 
@@ -87,11 +89,11 @@ class StatusCommand(commands.Cog):
         color=discord.Color.blue(),
     )
 
-    # --- ЭМБЕД 3: Bot Performance (Относительно 512 МБ) ---
+    # --- ЭМБЕД 3: Bot Performance ---
     embed_server = discord.Embed(
         title=f"🛠️ Bot Performance ({perf_status})",
         description=(
-            f"💻 **Process CPU:** `{cpu_usage}%` (Limit: 10% / 0.1 vCPU)\n"
+            f"💻 **Process CPU:** `{cpu_usage}%`\n"
             f"🧠 **Process RAM:** `{bot_ram_mb} MB / {container_ram_limit_mb} MB` (`{ram_percent}%`)\n"
             f"⏳ **Uptime:** `{uptime_str}`"
         ),

@@ -7,3 +7,4 @@ gspread>=6.0.0
 orjson>=3.9.0
 apscheduler>=3.10.0
 pytz>=2024.1
+psutil>=5.9.0

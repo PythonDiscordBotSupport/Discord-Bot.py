@@ -36,9 +36,9 @@ class StatusCommand(commands.Cog):
     mem_info = self.process.memory_info()
     bot_ram_mb = round(mem_info.rss / (1024 * 1024), 2)
     
-    # Считаем процент RAM относительно общей памяти хоста (или заданного лимита)
-    total_system_ram = psutil.virtual_memory().total
-    ram_percent = round((mem_info.rss / total_system_ram) * 100, 1)
+    # Считаем процент RAM строго относительно вашего лимита контейнера (512 МБ)
+    container_ram_limit_mb = 512
+    ram_percent = round((bot_ram_mb / container_ram_limit_mb) * 100, 1)
 
     # Аптайм
     uptime_seconds = int(time.time() - self.start_time)
@@ -55,7 +55,7 @@ class StatusCommand(commands.Cog):
       color_api = discord.Color.red()
       status_text = "🔴 High latency detected"
 
-    # 4. Цвет для Server Maintenance / Performance на основе RAM
+    # 4. Цвет для Bot Performance на основе лимита в 512 МБ
     if ram_percent < 50:
       color_perf = discord.Color.green()
       perf_status = "🟢 Optimal RAM Usage"
@@ -64,7 +64,7 @@ class StatusCommand(commands.Cog):
       perf_status = "🟠 Moderate RAM Usage"
     else:
       color_perf = discord.Color.red()
-      perf_status = "🔴 High RAM Usage"
+      perf_status = "🔴 High RAM Usage (Near Limit)"
 
     # --- ЭМБЕД 1: Discord Bot & API ---
     embed_bot = discord.Embed(
@@ -87,12 +87,12 @@ class StatusCommand(commands.Cog):
         color=discord.Color.blue(),
     )
 
-    # --- ЭМБЕД 3: Server Maintenance / Bot Performance ---
+    # --- ЭМБЕД 3: Bot Performance (Относительно 512 МБ) ---
     embed_server = discord.Embed(
         title=f"🛠️ Bot Performance ({perf_status})",
         description=(
-            f"💻 **Process CPU:** `{cpu_usage}%`\n"
-            f"🧠 **Process RAM:** `{bot_ram_mb} MB` (`{ram_percent}%` of system)\n"
+            f"💻 **Process CPU:** `{cpu_usage}%` (Limit: 10% / 0.1 vCPU)\n"
+            f"🧠 **Process RAM:** `{bot_ram_mb} MB / {container_ram_limit_mb} MB` (`{ram_percent}%`)\n"
             f"⏳ **Uptime:** `{uptime_str}`"
         ),
         color=color_perf,

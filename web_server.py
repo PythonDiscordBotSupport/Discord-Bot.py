@@ -5,23 +5,24 @@ import os
 
 app = Flask('')
 
-# Словарь для хранения времени последнего запроса от IP: { "127.0.0.1": 1718000000.0 }
+# Словарь для хранения времени последнего запроса от IP
 request_limits = {}
-TIME_WINDOW = 10 # секунд
+TIME_WINDOW = 10  # секунд
 
 @app.route('/')
 def home():
     client_ip = request.remote_addr
     current_time = time.time()
     
-    # Проверяем, был ли уже запрос от этого IP и прошло ли меньше 10 секунд
     if client_ip in request_limits:
         elapsed_time = current_time - request_limits[client_ip]
         if elapsed_time < TIME_WINDOW:
-            # Если прошло меньше 10 секунд — игнорируем и возвращаем ошибку
-            return "Too Many Requests. Please wait.", 429
+            # ТУПО ИГНОРИРУЕМ: заставляем поток "спать" и ничего не возвращаем
+            # Или возвращаем пустой ответ с обрывом (например, код 444, который Nginx/Flask воспринимает как сброс)
+            time.sleep(1) # Защита от моментального заспама процессора
+            return "", 444
 
-    # Обновляем время последнего запроса для этого IP
+    # Обновляем время последнего запроса
     request_limits[client_ip] = current_time
     
     return "Bot is running!", 200

@@ -8,3 +8,5 @@ orjson>=3.9.0
 apscheduler>=3.10.0
 pytz>=2024.1
 psutil>=5.9.0
+fastapi>=0.110.0
+uvicorn>=0.28.0

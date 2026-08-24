@@ -8,6 +8,11 @@ import psutil
 
 
 class StatusCommand(commands.Cog):
+  # Цветовая палитра в одном формате
+  COLOR_GREEN = discord.Color.from_str("#73d15e")
+  COLOR_ORANGE = discord.Color.from_str("#e8b53f")
+  COLOR_RED = discord.Color.from_str("#b81f24")
+  COLOR_BLUE = discord.Color.from_str("#4ec3ed")
 
   def __init__(self, bot: commands.Bot):
     self.bot = bot
@@ -47,30 +52,33 @@ class StatusCommand(commands.Cog):
     uptime_str = str(datetime.timedelta(seconds=uptime_seconds))
 
     # 3. Статус Discord API
-    if api_latency_ms <= 300:
-      color_api = discord.Color.green()
-      status_text = "🟢 All systems normal"
+    if api_latency_ms <= 250:
+      color_api = self.COLOR_GREEN
+      status_text = "⚡ Ultra Fast Connection"
+    elif api_latency_ms <= 400:
+      color_api = self.COLOR_GREEN
+      status_text = "🟢 Good Connection"
     elif api_latency_ms <= 600:
-      color_api = discord.Color.orange()
-      status_text = "🟠 Stable, but experiencing slight delay"
+      color_api = self.COLOR_ORANGE
+      status_text = "🟠 Comfortable Connection"
     else:
-      color_api = discord.Color.red()
-      status_text = "🔴 High latency detected"
+      color_api = self.COLOR_RED
+      status_text = "🔴 Unstable Connection"
 
     # 4. Цвет для Bot Performance на основе лимита в 512 МБ
     if ram_percent < 50:
-      color_perf = discord.Color.green()
+      color_perf = self.COLOR_GREEN
       perf_status = "🟢 Optimal RAM Usage"
     elif 50 <= ram_percent < 80:
-      color_perf = discord.Color.orange()
+      color_perf = self.COLOR_ORANGE
       perf_status = "🟠 Moderate RAM Usage"
     else:
-      color_perf = discord.Color.red()
+      color_perf = self.COLOR_RED
       perf_status = "🔴 High RAM Usage (Near Limit)"
 
     # --- ЭМБЕД 1: Discord Bot & API ---
     embed_bot = discord.Embed(
-        title="⚡ Discord API & WS",
+        title="⚡ Discord API",
         description=(
             f"**Status:** {status_text}\n"
             f"• **WebSocket:** `{ws_latency_ms} ms`\n"
@@ -81,12 +89,12 @@ class StatusCommand(commands.Cog):
 
     # --- ЭМБЕД 2: Roblox Open Cloud ---
     embed_roblox = discord.Embed(
-        title="🎮 Roblox Open Cloud",
+        title="🕹️ Roblox Open Cloud",
         description=(
             "🟢 **Webhook Active**\n"
             "*Awaiting data streams from game servers...*"
         ),
-        color=discord.Color.blue(),
+        color=self.COLOR_BLUE,
     )
 
     # --- ЭМБЕД 3: Bot Performance ---

@@ -33,14 +33,13 @@ class StatusCommand(commands.Cog):
   async def status(self, interaction: discord.Interaction):
     start_time_mono = time.monotonic()
 
-    # Сразу откладываем ответ
+    # 1. СРАЗУ отправляем defer, чтобы Discord знал, что мы думаем (защита от 404 Unknown interaction)
     await interaction.response.defer(thinking=True)
 
-    # 1. Замер латентности Discord
+    # 2. Метрики процесса бота и латентность
     api_latency_ms = (time.monotonic() - start_time_mono) * 1000
     ws_latency_ms = round(self.bot.latency * 1000)
 
-    # 2. Метрики процесса бота
     raw_cpu_usage = self.process.cpu_percent(interval=None)
     cpu_usage = round(raw_cpu_usage * 10, 1)
 
@@ -50,11 +49,10 @@ class StatusCommand(commands.Cog):
     container_ram_limit_mb = 512
     ram_percent = round((bot_ram_mb / container_ram_limit_mb) * 100, 1)
 
-    # --- ТОЧНЫЙ АНАЛИЗ ПАМЯТИ ПО ВАШИМ ПАПКАМ ---
+    # 3. ТОЧНЫЙ АНАЛИЗ ПАМЯТИ (теперь безопасен, так как defer уже ушел)
     snapshot = tracemalloc.take_snapshot()
     stats = snapshot.statistics('filename')
 
-    # Инициализируем словарь под ваши папки со скриншота
     folder_usage = {
         "automation": 0.0,
         "core": 0.0,
@@ -81,19 +79,17 @@ class StatusCommand(commands.Cog):
         else:
             folder_usage["other"] += size_kb
 
-    # Конвертируем килобайты в мегабайты
     auto_mb = round(folder_usage["automation"] / 1024, 2)
     core_mb = round(folder_usage["core"] / 1024, 2)
     discord_cmd_mb = round(folder_usage["discord_commands"] / 1024, 2)
     roblox_cmd_mb = round(folder_usage["roblox_commands"] / 1024, 2)
     libs_mb = round(folder_usage["libraries"] / 1024, 2)
-    other_mb = round(folder_usage["other"] / 1024, 2)
 
     # Аптайм
     uptime_seconds = int(time.time() - self.start_time)
     uptime_str = str(datetime.timedelta(seconds=uptime_seconds))
 
-    # 3. Статус Discord API
+    # Статусы и цвета
     if api_latency_ms <= 250:
       color_api = self.COLOR_GREEN
       status_text = "⚡ Ultra Fast Connection"
@@ -107,7 +103,6 @@ class StatusCommand(commands.Cog):
       color_api = self.COLOR_RED
       status_text = "🔴 Unstable Connection"
 
-    # 4. Цвет для Bot Performance
     if ram_percent < 50:
       color_perf = self.COLOR_GREEN
       perf_status = "🟢 Optimal RAM Usage"
@@ -118,7 +113,7 @@ class StatusCommand(commands.Cog):
       color_perf = self.COLOR_RED
       perf_status = "🔴 High RAM Usage (Near Limit)"
 
-    # --- ЭМБЕД 1: Discord Bot & API ---
+    # Эмбеды
     embed_bot = discord.Embed(
         title="⚡ Discord API",
         description=(
@@ -129,7 +124,6 @@ class StatusCommand(commands.Cog):
         color=color_api,
     )
 
-    # --- ЭМБЕД 2: Roblox Open Cloud ---
     embed_roblox = discord.Embed(
         title="🕹️ Roblox Open Cloud",
         description=(
@@ -139,7 +133,6 @@ class StatusCommand(commands.Cog):
         color=self.COLOR_BLUE,
     )
 
-    # --- ЭМБЕД 3: Bot Performance (Детально по вашим папкам) ---
     embed_server = discord.Embed(
         title=f"🛠️ Bot Performance ({perf_status})",
         description=(
@@ -158,7 +151,7 @@ class StatusCommand(commands.Cog):
 
     embed_server.set_footer(text=f"Requested by {interaction.user.name}")
 
-    # Отправляем три раздельных эмбеда
+    # Отправляем ответ через followup
     await interaction.followup.send(
         embeds=[embed_bot, embed_roblox, embed_server]
     )
@@ -166,4 +159,4 @@ class StatusCommand(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(StatusCommand(bot))
-  
+    

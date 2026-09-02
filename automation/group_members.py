@@ -1,53 +1,55 @@
+import aiohttp
 import asyncio
-import pandas as pd
 from discord.ext import commands
 import config
 
 
-async def update_division_stats(bot: commands.Bot):
-    url = "https://docs.google.com/spreadsheets/d/1sQIT3aOs1dWB9-f8cbsYe7MnSRfCfLRgMDSuE5b3w1I/export?format=csv"
-    target = "Sea Agent Recon Unit"
+async def update_roblox_group_members(bot: commands.Bot):
+    group_id = getattr(config, "group_id", None)
+    channel_id = getattr(config, "group_members", None)
+    errors_channel_id = getattr(config, "errors", None)
+
+    if not group_id or not channel_id:
+        return
+
+    url = f"https://groups.roblox.com/v1/groups/{group_id}"
 
     try:
-        df = await asyncio.to_thread(pd.read_csv, url, header=None)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status != 200:
+                    raise Exception(f"Roblox API returned status code {response.status}")
+                
+                data = await response.json()
+                member_count = data.get("memberCount")
+                
+                if member_count is None:
+                    raise Exception("Failed to retrieve member count from Roblox API response.")
 
-        mask = df.iloc[:, 0].astype(str).str.contains(target, case=False, na=False)
-        match = df[mask]
+                new_name = f"⭐┆Group Members: {member_count}"
 
-        if match.empty:
-            print(f"[Division Info] Ничего не найдено по запросу: '{target}'")
-            return
-
-        # Извлечение только цифр из столбцов B и D
-        val_b_raw = str(match.iloc[0, 1])
-        val_b = "".join(filter(str.isdigit, val_b_raw))
-
-        val_d_raw = str(match.iloc[0, 3])
-        val_d = "".join(filter(str.isdigit, val_d_raw))
-
-        level_name = f"🆙┆Division Level: {val_b}"
-        exp_name = f"✨┆Division Experiences: {val_d}"
-
-        level_channel_id = getattr(config, "division_level", None)
-        exp_channel_id = getattr(config, "division_exp", None)
-
-        if level_channel_id:
-            channel_level = bot.get_channel(int(level_channel_id))
-            if channel_level:
-                await channel_level.edit(name=level_name)
-                print(f"[Division Info] Канал уровня обновлен: {level_name}")
-
-        if exp_channel_id:
-            channel_exp = bot.get_channel(int(exp_channel_id))
-            if channel_exp:
-                await channel_exp.edit(name=exp_name)
-                print(f"[Division Info] Канал опыта обновлен: {exp_name}")
+                channel = bot.get_channel(int(channel_id))
+                if channel:
+                    if channel.name != new_name:
+                        await channel.edit(name=new_name)
+                        print(f"[Roblox Group] Group members channel updated: {new_name}")
 
     except Exception as e:
-        print(f"[Division Info] Ошибка при обновлении статистики: {e}")
+        error_msg = f"[Roblox Group] Error updating member count: {e}"
+        print(error_msg)
+
+        if errors_channel_id:
+            error_channel = bot.get_channel(int(errors_channel_id))
+            if error_channel:
+                embed = discord.Embed(
+                    title="❌ Error",
+                    description=str(e),
+                    color=discord.Color.red()
+                )
+                await error_channel.send(embed=embed)
 
 
-# Позволяет discord.py распознать этот файл как полноценный загруженный модуль
 async def setup(bot: commands.Bot):
-    pass
-        
+    # If you want it to run periodically, you can schedule it or run it once upon loading
+    bot.loop.create_task(update_roblox_group_members(bot))
+  

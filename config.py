@@ -8,7 +8,7 @@ restart_token = os.environ.get("restart_token")
 division_administrator = ""
 head_moderator = ""
 moderator = ""
-human_resources = ""
+human_resources = 1487518138974208142
 # Channels IDs
 notifications = 1507853423117336691
 errors = 1500591818532978909

@@ -14,6 +14,20 @@ class PromoteCommand(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        
+        # Автоматически собираем ID иммунных ролей на основе их названий в complete_roles
+        self.immutable_role_ids = {
+            complete_roles[name]["role_id"]
+            for name in immutable_roles
+            if name in complete_roles
+        }
+        
+        # Автоматически собираем ID операционных ролей на основе их названий в complete_roles
+        self.operational_role_ids = {
+            complete_roles[name]["role_id"]
+            for name in operational_roles
+            if name in complete_roles
+        }
 
     async def _get_roblox_user_id(self, username_or_id: str) -> int | None:
         """Конвертирует никнейм Roblox в ID или проверяет переданный ID."""
@@ -88,14 +102,14 @@ class PromoteCommand(commands.Cog):
             current_role_name = current_role_data["name"]
             current_role_id = current_role_data["id"]
 
-            # Проверки по спискам ролей
-            if current_role_name in immutable_roles:
+            # Проверки по ID (на основе списков operational и immutable)
+            if current_role_id in self.immutable_role_ids:
                 raise ValueError(f"Роль '{current_role_name}' защищена от изменений.")
 
-            if current_role_name not in operational_roles:
+            if current_role_id not in self.operational_role_ids:
                 raise ValueError(f"Роль '{current_role_name}' не входит в operational roles.")
 
-            # Поиск текущего веса и следующей роли
+            # Поиск текущего веса и следующей роли через complete_roles
             current_weight = None
             for r_name, r_info in complete_roles.items():
                 if r_info["role_id"] == current_role_id:
@@ -161,4 +175,4 @@ class PromoteCommand(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(PromoteCommand(bot))
-          
+                

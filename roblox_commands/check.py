@@ -3,21 +3,37 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-# Импортируем готовые структуры ролей из отдельного файла
+# Импортируем ID группы и канала ошибок из конфига
+from config import errors, group_id
+
+# Импортируем структуры ролей из файла group_roles.py
 from group_roles import complete_roles, immutable_roles, operational_roles
 
 
 class CheckCommand(commands.Cog):
-  # Цветовая палитра под ваш стиль
   COLOR_ORANGE = discord.Color.from_str("#e8b53f")
   COLOR_RED = discord.Color.from_str("#b81f24")
 
   def __init__(self, bot: commands.Bot):
     self.bot = bot
-    self.group_id = 14543769
+
+  async def _log_error_to_channel(self, error_message: str):
+    if not errors:
+      return
+    channel = self.bot.get_channel(errors)
+    if channel:
+      embed_log = discord.Embed(
+          title="🚨 Check Command Error Log",
+          description=error_message,
+          color=self.COLOR_RED,
+      )
+      embed_log.timestamp = discord.utils.utcnow()
+      try:
+        await channel.send(embed=embed_log)
+      except Exception:
+        pass
 
   async def _get_user_id_by_username(self, username: str) -> int | None:
-    """Конвертирует никнейм Roblox в UserId через публичный API"""
     url = "https://users.roblox.com/v1/usernames/users"
     payload = {"usernames": [username], "excludeBannedUsers": True}
     async with aiohttp.ClientSession() as session:
@@ -30,7 +46,6 @@ class CheckCommand(commands.Cog):
     return None
 
   async def _get_username_by_user_id(self, user_id: int) -> str | None:
-    """Получает никнейм пользователя по его UserId"""
     url = f"https://users.roblox.com/v1/users/{user_id}"
     async with aiohttp.ClientSession() as session:
       async with session.get(url) as resp:
@@ -40,14 +55,14 @@ class CheckCommand(commands.Cog):
     return None
 
   async def _get_user_group_role(self, user_id: int) -> tuple[str, int]:
-    """Запрашивает роль пользователя в целевой группе по API"""
     url = f"https://groups.roblox.com/v1/users/{user_id}/groups/roles"
     async with aiohttp.ClientSession() as session:
       async with session.get(url) as resp:
         if resp.status == 200:
           data = await resp.json()
           for group in data.get("data", []):
-            if group.get("group", {}).get("id") == self.group_id:
+            # Проверяем group_id из config
+            if group.get("group", {}).get("id") == group_id:
               role_data = group.get("role", {})
               return role_data.get("name", "Guest"), role_data.get(
                   "id", 82396917
@@ -72,15 +87,17 @@ class CheckCommand(commands.Cog):
     user_id = None
     username = None
 
-    # Определяем, передали ли нам числовой ID или строковый ник
     if query.isdigit():
       user_id = int(query)
       username = await self._get_username_by_user_id(user_id)
       if not username:
+        error_desc = f"User with ID `{user_id}` not found on Roblox."
+        await self._log_error_to_channel(
+            f"**Command:** `/check`\n**Query:** `{query}`\n**Reason:**"
+            f" {error_desc}"
+        )
         embed_err = discord.Embed(
-            title="❌ Error",
-            description=f"User with ID `{user_id}` not found on Roblox.",
-            color=self.COLOR_RED,
+            title="❌ Error", description=error_desc, color=self.COLOR_RED
         )
         await interaction.followup.send(embed=embed_err)
         return
@@ -88,31 +105,32 @@ class CheckCommand(commands.Cog):
       username = query.strip()
       user_id = await self._get_user_id_by_username(username)
       if not user_id:
+        error_desc = f"Roblox user `{username}` not found."
+        await self._log_error_to_channel(
+            f"**Command:** `/check`\n**Query:** `{query}`\n**Reason:**"
+            f" {error_desc}"
+        )
         embed_err = discord.Embed(
-            title="❌ Error",
-            description=f"Roblox user `{username}` not found.",
-            color=self.COLOR_RED,
+            title="❌ Error", description=error_desc, color=self.COLOR_RED
         )
         await interaction.followup.send(embed=embed_err)
         return
 
-    # Получаем роль игрока в группе
     roblox_role_name, roblox_role_id = await self._get_user_group_role(user_id)
 
-    # Ищем чистое название роли в complete_roles по role_id
     matched_role_name = "Guest"
     for role_name, data in complete_roles.items():
       if data["role_id"] == roblox_role_id:
         matched_role_name = role_name
         break
 
-    # Определяем статус роли (Immutable или Operational)
-    if matched_role_name in immutable_roles:
+    if matched_role_name == "Guest":
+      role_status = "Guest"
+    elif matched_role_name in immutable_roles:
       role_status = "Immutable Role"
     else:
       role_status = "Operational Role"
 
-    # Формируем пастельно-оранжевый эмбед
     embed = discord.Embed(
         title="🔍 Roblox User Verification",
         description=(

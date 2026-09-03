@@ -11,8 +11,7 @@ from group_roles import complete_roles, immutable_roles, operational_roles
 
 
 class CheckCommand(commands.Cog):
-  # Используем стандартные встроенные цвета discord.py
-  COLOR_ORANGE = discord.Color.orange()
+  # Оставляем только красный для ошибок логов
   COLOR_RED = discord.Color.red()
 
   def __init__(self, bot: commands.Bot):
@@ -139,7 +138,7 @@ class CheckCommand(commands.Cog):
             f"• **Rank:** `{matched_role_name}`\n"
             f"• **Status:** `{role_status}`"
         ),
-        color=self.COLOR_ORANGE,
+        color=discord.Color.random(),  # Теперь цвет будет каждый раз случайным!
     )
 
     embed.set_footer(text=f"Requested by {interaction.user.name}")
@@ -150,4 +149,4 @@ class CheckCommand(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(CheckCommand(bot))
-  
+        

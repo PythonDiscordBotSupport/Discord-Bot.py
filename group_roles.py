@@ -67,5 +67,6 @@ immutable_roles = [
     "Director General",
     "Senior Overseeing General",
     "Overseeing General",
+    "Junior Overseeing General",
     "Division administration"
 ]

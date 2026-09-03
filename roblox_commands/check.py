@@ -11,8 +11,9 @@ from group_roles import complete_roles, immutable_roles, operational_roles
 
 
 class CheckCommand(commands.Cog):
-  COLOR_ORANGE = discord.Color.from_str("#e8b53f")
-  COLOR_RED = discord.Color.from_str("#b81f24")
+  # Используем стандартные встроенные цвета discord.py
+  COLOR_ORANGE = discord.Color.orange()
+  COLOR_RED = discord.Color.red()
 
   def __init__(self, bot: commands.Bot):
     self.bot = bot
@@ -61,7 +62,6 @@ class CheckCommand(commands.Cog):
         if resp.status == 200:
           data = await resp.json()
           for group in data.get("data", []):
-            # Проверяем group_id из config
             if group.get("group", {}).get("id") == group_id:
               role_data = group.get("role", {})
               return role_data.get("name", "Guest"), role_data.get(

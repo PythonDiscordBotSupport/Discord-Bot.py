@@ -18,6 +18,7 @@ is_first_ready = True  # Флаг для предотвращения спама
 async def load_extensions():
     folders = ["discord_commands", "roblox_commands", "automation"]
 
+    # Загружаем модули из стандартных папок
     for folder in folders:
         if os.path.exists(folder):
             for filename in os.listdir(folder):
@@ -30,6 +31,15 @@ async def load_extensions():
                     except Exception as e:
                         failed_modules.append((module_name, str(e)))
                         print(f"Failed to load {module_name}: {e}")
+
+    # Точечно загружаем системный модуль рестарта из core
+    try:
+        await bot.load_extension("core.restart")
+        loaded_modules.append("core.restart")
+        print("Loaded module: core.restart")
+    except Exception as e:
+        failed_modules.append(("core.restart", str(e)))
+        print(f"Failed to load core.restart: {e}")
 
 
 @bot.event

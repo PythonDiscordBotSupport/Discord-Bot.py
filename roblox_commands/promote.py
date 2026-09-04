@@ -72,14 +72,14 @@ class PromoteCommand(commands.Cog):
                 return response.status == 200
 
     @app_commands.command(
-        name="promote", description="Повысить участника в группе на 1 ранг"
+        name="promote", description="Promote a group member by 1 rank"
     )
-    @app_commands.describe(user="Никнейм или ID пользователя в Roblox")
+    @app_commands.describe(user="Roblox username or user ID")
     async def promote(self, interaction: discord.Interaction, user: str):
         # 1. Проверка наличия роли HR у пользователя в Discord
         if not any(role.id == human_resources for role in interaction.user.roles):
             await interaction.response.send_message(
-                "У вас нет прав для использования этой команды.", ephemeral=True
+                "You do not have permission to use this command.", ephemeral=True
             )
             return
 
@@ -92,24 +92,24 @@ class PromoteCommand(commands.Cog):
             # 2. Получение ID пользователя Roblox
             roblox_id = await self._get_roblox_user_id(user)
             if not roblox_id:
-                raise ValueError(f"Пользователь Roblox '{user}' не найден.")
+                raise ValueError(f"Roblox user '{user}' not found.")
 
             # 3. Получение текущей роли в группе
             current_role_data = await self._get_user_roblox_role(roblox_id)
             if not current_role_data:
-                raise ValueError("Пользователь не состоит в группе.")
+                raise ValueError("User is not in the group.")
 
             current_role_name = current_role_data["name"]
             current_role_id = current_role_data["id"]
 
-            # Проверки по ID (на основе списков operational и immutable)
+            # Проверки текущей роли по ID
             if current_role_id in self.immutable_role_ids:
-                raise ValueError(f"Роль '{current_role_name}' защищена от изменений.")
+                raise ValueError(f"The role '{current_role_name}' is protected from changes.")
 
             if current_role_id not in self.operational_role_ids:
-                raise ValueError(f"Роль '{current_role_name}' не входит в operational roles.")
+                raise ValueError(f"The role '{current_role_name}' is not within operational roles.")
 
-            # Поиск текущего веса и следующей роли через complete_roles
+            # Поиск текущего веса роли
             current_weight = None
             for r_name, r_info in complete_roles.items():
                 if r_info["role_id"] == current_role_id:
@@ -117,8 +117,9 @@ class PromoteCommand(commands.Cog):
                     break
 
             if current_weight is None:
-                raise ValueError("Текущая роль не найдена в системной базе ролей.")
+                raise ValueError("Current role not found in the system role database.")
 
+            # Поиск следующего ранга
             next_weight = current_weight + 1
             next_role_name = None
             next_role_id = None
@@ -130,15 +131,19 @@ class PromoteCommand(commands.Cog):
                     break
 
             if not next_role_name:
-                raise ValueError("Достигнут максимальный возможный ранг.")
+                raise ValueError("Maximum possible rank has been reached.")
+
+            # Защита: проверка, входит ли НОВАЯ роль в operational roles
+            if next_role_id not in self.operational_role_ids:
+                raise ValueError(f"Promotion failed: the next rank '{next_role_name}' is outside operational roles.")
 
             # 4. Отправка запроса в Cloud API
             success = await self._set_roblox_role(roblox_id, next_role_id)
             if not success:
-                raise RuntimeError("Ошибка при запросе к Roblox Cloud API.")
+                raise RuntimeError("Failed to execute request to Roblox Cloud API.")
 
             # 5. Успешное выполнение: отправка сообщений и зеленого эмбеда
-            await interaction.followup.send(f"{user} был повышен")
+            await interaction.followup.send(f"{user} has been promoted.")
 
             if progression_channel:
                 embed = discord.Embed(title="Promotion", color=self.COLOR_GREEN)
@@ -157,7 +162,7 @@ class PromoteCommand(commands.Cog):
 
         except Exception as e:
             error_text = str(e)
-            await interaction.followup.send(f"Произошла ошибка: {error_text}", ephemeral=True)
+            await interaction.followup.send(f"An error occurred: {error_text}", ephemeral=True)
 
             if errors_channel:
                 error_embed = discord.Embed(
@@ -175,4 +180,4 @@ class PromoteCommand(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(PromoteCommand(bot))
-                
+    

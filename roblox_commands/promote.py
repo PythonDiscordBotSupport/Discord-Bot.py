@@ -143,7 +143,7 @@ class PromoteCommand(commands.Cog):
                 raise RuntimeError("Failed to execute request to Roblox Cloud API.")
 
             # 5. Успешное выполнение: отправка сообщений и зеленого эмбеда
-            await interaction.followup.send(f"{user} has been promoted.")
+            await interaction.followup.send(f"{user} has been promoted from **{current_role_name}** to **{next_role_name}**.")
 
             if progression_channel:
                 embed = discord.Embed(title="Promotion", color=self.COLOR_GREEN)

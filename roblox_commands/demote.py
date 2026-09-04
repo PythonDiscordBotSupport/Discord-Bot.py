@@ -142,7 +142,7 @@ class DemoteCommand(commands.Cog):
                 raise RuntimeError("Failed to execute request to Roblox Cloud API.")
 
             # 5. Successful execution: send messages and red embed
-            await interaction.followup.send(f"{user} has been demoted.")
+            await interaction.followup.send(f"{user} has been demoted from **{current_role_name}** to **{next_role_name}**.")
 
             if progression_channel:
                 embed = discord.Embed(title="Demotion", color=self.COLOR_RED)

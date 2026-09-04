@@ -35,7 +35,6 @@ complete_roles = {
 }
 
 operational_roles = [
-    "Roblox developer",
     "VIP",
     "TO ( High tier)",
     "TO ( Low tier)",
@@ -68,5 +67,6 @@ immutable_roles = [
     "Senior Overseeing General",
     "Overseeing General",
     "Junior Overseeing General",
-    "Division administration"
+    "Division administration",
+    "Roblox developer"
 ]

@@ -27,8 +27,8 @@ class CustomEmbedCog(commands.Cog):
         "cyan": "\u001b[36m",
     }
 
-    # Search for patterns like: text[color]
-    pattern = re.compile(r"([^\[]+?)\[(red\vert{}green\vert{}yellow\vert{}blue\vert{}purple\vert{}cyan)\]", re.IGNORECASE)
+    # Ищем слово прямо перед скобками без пробела: слово[цвет]
+    pattern = re.compile(r"([^\s\[]+)\[(red\vert{}green\vert{}yellow\vert{}blue\vert{}purple\vert{}cyan)\]", re.IGNORECASE)
 
     def replace_match(match):
       word = match.group(1)

@@ -14,7 +14,7 @@ class HRSlotsSetupCommand(commands.Cog):
     self.bot = bot
 
   @app_commands.command(
-      name="HRs",
+      name="high ranks",
       description="Creates an empty HR Slots embed template for future updates",
   )
   @app_commands.checks.has_permissions(administrator=True)

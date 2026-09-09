@@ -7,9 +7,6 @@ from config import errors
 
 
 class EmbedCommand(commands.Cog):
-  # Color palette
-  COLOR_BLUE = discord.Color.from_str("#4ec3ed")
-
   def __init__(self, bot: commands.Bot):
     self.bot = bot
 
@@ -22,10 +19,13 @@ class EmbedCommand(commands.Cog):
     # Defer response to prevent timeouts
     await interaction.response.defer(thinking=True, ephemeral=True)
 
-    # Create an empty embed with color
-    embed = discord.Embed(color=self.COLOR_BLUE)
+    # Create an embed with a zero-width space and built-in blue color
+    embed = discord.Embed(
+        description="", 
+        color=discord.Color.blue()
+    )
 
-    # Send the empty embed to the channel where the command was invoked
+    # Send the embed to the channel where the command was invoked
     await interaction.channel.send(embed=embed)
 
     # Notify the administrator privately that the embed has been sent
@@ -42,13 +42,17 @@ class EmbedCommand(commands.Cog):
       if interaction.response.is_done():
         await interaction.followup.send(msg, ephemeral=True)
       else:
-      # Send response message if interaction wasn't deferred yet
         await interaction.response.send_message(msg, ephemeral=True)
     else:
-      # Log unexpected errors to the error channel specified in config
+      # Log unexpected errors as a built-in red embed to the error channel specified in config
       error_channel = self.bot.get_channel(errors)
       if error_channel:
-        await error_channel.send(f"⚠️ Error in `/embed` command by {interaction.user}: `{error}`")
+        error_embed = discord.Embed(
+            title="⚠️ Command Error",
+            description=f"**Command:** `/embed`\n**User:** {interaction.user} (`{interaction.user.id}`)\n**Error:** ```python\n{error}\n```",
+            color=discord.Color.red()
+        )
+        await error_channel.send(embed=error_embed)
       raise error
 
 

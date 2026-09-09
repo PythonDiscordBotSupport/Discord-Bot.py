@@ -19,9 +19,10 @@ class EmbedCommand(commands.Cog):
     # Defer response to prevent timeouts
     await interaction.response.defer(thinking=True, ephemeral=True)
 
-    # Create an embed with a zero-width space and built-in blue color
+    # Create an embed with "Empty" in both title and description
     embed = discord.Embed(
-        description="", 
+        title="Empty",
+        description="Empty", 
         color=discord.Color.blue()
     )
 

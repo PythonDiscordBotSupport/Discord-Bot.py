@@ -6,6 +6,7 @@ from automation.group_members import update_roblox_group_members
 from automation.enlisted_members import EnlistedStats # или соответствующая функция обновления, если они оформлены как функции, либо импортируем из нужных модулей
 from automation.officer_members import OfficerStats
 from automation.hicom_members import HicomStats
+from automation.hr_slots import update_hr_slots
 
 
 class AutomationCore(commands.Cog):
@@ -45,6 +46,8 @@ class AutomationCore(commands.Cog):
         
         # Ждем 1 минуту
         await asyncio.sleep(60)
+
+        await update_hr_slots(self.bot)
         
         # Ждем 1 минуту
         await asyncio.sleep(60)

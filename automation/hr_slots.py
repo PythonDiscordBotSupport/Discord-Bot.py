@@ -5,7 +5,7 @@ import pandas as pd
 import config
 
 
-async def update_division_stats(bot: commands.Bot):
+async def update_hr_slots(bot: commands.Bot):
   url = "https://docs.google.com/spreadsheets/d/1sQIT3aOs1dWB9-f8cbsYe7MnSRfCfLRgMDSuE5b3w1I/export?format=csv"
   target = "[SEA] SEA Agent Recon Unit"
 
@@ -38,9 +38,8 @@ async def update_division_stats(bot: commands.Bot):
       if val_a.startswith("[SEA]") and current_idx != start_idx + 1:
         break
 
-      # Очистка столбца А от "DIVISION LEADER" (если нужно заменить или убрать)
+      # Очистка столбца А от "DIVISION LEADER"
       if "DIVISION LEADER" in val_a.upper():
-        # Пример: заменяем "HC1 - DIVISION LEADER" на "Leader" или просто убираем фразу
         clean_role = val_a.replace("DIVISION LEADER", "").strip(" -")
       else:
         clean_role = val_a
@@ -98,3 +97,4 @@ async def update_division_stats(bot: commands.Bot):
 
 async def setup(bot: commands.Bot):
   pass
+  

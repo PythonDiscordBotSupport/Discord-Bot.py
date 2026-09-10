@@ -12,7 +12,10 @@ async def update_hr_slots(bot: commands.Bot):
   try:
     df = await asyncio.to_thread(pd.read_csv, url, header=None)
 
-    mask = df.iloc[:, 0].astype(str).str.contains(target, case=False, na=False)
+    # regex=False отключает интерпретацию квадратных скобок как спецсимволов поиска
+    mask = df.iloc[:, 0].astype(str).str.contains(
+        target, case=False, na=False, regex=False
+    )
     match_indices = df[mask].index
 
     if match_indices.empty:

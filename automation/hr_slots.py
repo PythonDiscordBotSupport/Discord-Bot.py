@@ -60,12 +60,14 @@ async def update_hr_slots(bot: commands.Bot):
 
     description = "\n".join(hr_list) if hr_list else "List is empty"
 
-    embed_info = getattr(config, "hr_embed", None)
-    if not embed_info:
-      raise ValueError("Parameter hr_embed not found in config.py")
+    # Берем ID канала из hr_tracker, а ID сообщения из hr_embed
+    channel_id = getattr(config, "hr_tracker", None)
+    message_id = getattr(config, "hr_embed", None)
 
-    channel_id = embed_info.get("channel_id")
-    message_id = embed_info.get("message_id")
+    if not channel_id:
+      raise ValueError("Parameter hr_tracker not found in config.py")
+    if not message_id:
+      raise ValueError("Parameter hr_embed not found in config.py")
 
     channel = bot.get_channel(int(channel_id))
     if not channel:

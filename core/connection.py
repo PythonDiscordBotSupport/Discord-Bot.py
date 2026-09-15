@@ -32,7 +32,7 @@ async def load_extensions():
                         failed_modules.append((module_name, str(e)))
                         print(f"Failed to load {module_name}: {e}")
 
-    # Точечно загружаем системный модуль рестарта из core
+        # Точечно загружаем системный модуль рестарта из core
     try:
         await bot.load_extension("core.restart")
         loaded_modules.append("core.restart")
@@ -41,6 +41,14 @@ async def load_extensions():
         failed_modules.append(("core.restart", str(e)))
         print(f"Failed to load core.restart: {e}")
 
+    # Точечно загружаем модуль watchdog (сторожа) из core
+    try:
+        await bot.load_extension("core.watchdog")
+        loaded_modules.append("core.watchdog")
+        print("Loaded module: core.watchdog")
+    except Exception as e:
+        failed_modules.append(("core.watchdog", str(e)))
+        print(f"Failed to load core.watchdog: {e}")
 
 @bot.event
 async def setup_hook():

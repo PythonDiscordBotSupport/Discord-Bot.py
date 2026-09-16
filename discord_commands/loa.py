@@ -7,7 +7,7 @@ import gspread
 # Импорты из вашего конфига (config.py)
 from config import (
     errors,  # ID канала для логирования ошибок
-    human_resources_role_id,  # ID роли HR
+    human_resources,  # ID роли HR (исправлено)
     loa_apps_channel_id,  # ID канала для заявок
     loa_logs_channel_id,  # ID канала для логов окончания LOA
 )
@@ -34,7 +34,7 @@ class LOAView(discord.ui.View):
     self.reason = reason
 
   async def interaction_check(self, interaction: discord.Interaction) -> bool:
-    role = interaction.guild.get_role(human_resources_role_id)
+    role = interaction.guild.get_role(human_resources)
     if role and role in interaction.user.roles:
       return True
     await interaction.response.send_message(
@@ -272,4 +272,5 @@ class LOACog(commands.Cog):
 
 async def setup_loa_cog(bot: commands.Bot):
   await bot.add_cog(LOACog(bot))
+  print("✅ LOACog has been successfully loaded!")
     

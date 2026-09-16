@@ -270,7 +270,6 @@ class LOACog(commands.Cog):
     raise error
 
 
-async def setup_loa_cog(bot: commands.Bot):
+async def setup(bot: commands.Bot):
   await bot.add_cog(LOACog(bot))
-  print("✅ LOACog has been successfully loaded!")
     

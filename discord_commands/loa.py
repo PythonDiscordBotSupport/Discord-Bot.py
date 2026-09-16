@@ -7,7 +7,7 @@ import gspread
 # Импорты из вашего конфига (config.py)
 from config import (
     errors,  # ID канала для логирования ошибок
-    human_resources,  # ID роли HR (исправлено)
+    human_resources,  # ID роли HR
     loa_apps_channel_id,  # ID канала для заявок
     loa_logs_channel_id,  # ID канала для логов окончания LOA
 )
@@ -48,6 +48,9 @@ class LOAView(discord.ui.View):
   async def accept_callback(
       self, interaction: discord.Interaction, button: discord.ui.Button
   ):
+    # Предотвращаем таймаут интеракции (ошибка 10062)
+    await interaction.response.defer(ephemeral=True)
+
     try:
       await self.user.send(
           f"Your LOA request ({self.start_date} - {self.end_date}) has been"
@@ -68,7 +71,9 @@ class LOAView(discord.ui.View):
     )
 
     await interaction.message.edit(embed=embed, view=self)
-    await interaction.response.send_message(
+    
+    # Используем followup, так как был сделан defer()
+    await interaction.followup.send(
         "✅ Request successfully accepted.", ephemeral=True
     )
 
@@ -78,6 +83,9 @@ class LOAView(discord.ui.View):
   async def deny_callback(
       self, interaction: discord.Interaction, button: discord.ui.Button
   ):
+    # Предотвращаем таймаут интеракции (ошибка 10062)
+    await interaction.response.defer(ephemeral=True)
+
     try:
       await self.user.send(
           f"Your LOA request ({self.start_date} - {self.end_date}) has been"
@@ -95,7 +103,9 @@ class LOAView(discord.ui.View):
     )
 
     await interaction.message.edit(embed=embed, view=self)
-    await interaction.response.send_message(
+    
+    # Используем followup, так как был сделан defer()
+    await interaction.followup.send(
         "❌ Request denied.", ephemeral=True
     )
 
@@ -272,4 +282,4 @@ class LOACog(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(LOACog(bot))
-    
+      

@@ -190,6 +190,71 @@ class LOACog(commands.Cog):
     self.bot = bot
     self.check_loa_expiry.start()
 
+  async def cog_load(self):
+    """Автоматический запуск восстановления кнопок при старте кога"""
+    self.bot.loop.create_task(self.restore_pending_loa_views())
+
+  async def restore_pending_loa_views(self):
+    """Восстановление активных кнопок для неотвеченных заявок из канала заявок"""
+    await self.bot.wait_until_ready()
+    channel = self.bot.get_channel(loa_apps_channel_id)
+    if not channel:
+      return
+
+    print("🔄 Восстановление активных LOA кнопок из истории канала...")
+    restored_count = 0
+
+    try:
+      async for message in channel.history(limit=50):
+        if message.author == self.bot.user and message.embeds:
+          embed = message.embeds[0]
+
+          # Проверяем, есть ли статус (если нет — заявка ждет решения)
+          has_status = any(field.name == "Status" for field in embed.fields)
+
+          if not has_status:
+            user_id = None
+            start_date = None
+            end_date = None
+            duration = None
+            reason = None
+
+            for field in embed.fields:
+              if field.name == "User ID":
+                user_id = int(field.value)
+              elif field.name == "Start Date":
+                start_date = field.value
+              elif field.name == "End Date":
+                end_date = field.value
+              elif field.name == "Duration":
+                duration = int(field.value.split()[0])
+              elif field.name == "Reason":
+                reason = field.value
+
+            if user_id and start_date and end_date and duration is not None and reason:
+              user = self.bot.get_user(user_id)
+              if not user:
+                try:
+                  user = await self.bot.fetch_user(user_id)
+                except Exception:
+                  continue
+
+              if user:
+                view = LOAView(
+                    user=user,
+                    start_date=start_date,
+                    end_date=end_date,
+                    duration=duration,
+                    reason=reason,
+                )
+                self.bot.add_view(view, message_id=message.id)
+                restored_count += 1
+
+      print(f"✅ Успешно восстановлено активных LOA заявок: {restored_count}")
+
+    except Exception as e:
+      print(f"🚨 Ошибка при восстановлении LOA views: {e}")
+
   def cog_unload(self):
     self.check_loa_expiry.cancel()
 
@@ -211,17 +276,8 @@ class LOACog(commands.Cog):
       end_date: str,
       reason: str,
   ):
-    # Time safety check (1 hour before 12:00 UTC and 00:00 UTC)
+    # Защита от рестартов удалена, команда доступна 24/7
     now_utc = datetime.now(timezone.utc)
-    hour = now_utc.hour
-
-    if hour == 11 or hour == 23:
-      await interaction.response.send_message(
-          "⚠️ This command is temporarily unavailable (safety lock 1 hour"
-          " before restart at 12:00 / 00:00 UTC). Please try again later.",
-          ephemeral=True,
-      )
-      return
 
     # Parse dates and calculate duration
     try:
@@ -270,7 +326,10 @@ class LOACog(commands.Cog):
         reason=reason,
     )
 
-    await channel.send(embed=embed, view=view)
+    sent_message = await channel.send(embed=embed, view=view)
+    # Регистрируем View для персистентности сгенерированного сообщения сразу
+    self.bot.add_view(view, message_id=sent_message.id)
+
     await interaction.response.send_message(
         "✅ Your LOA request has been successfully submitted for review!",
         ephemeral=True,
@@ -347,4 +406,4 @@ class LOACog(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(LOACog(bot))
-          
+      

@@ -16,7 +16,7 @@ from config import (
 SPREADSHEET_ID = "18v7NrP7-ipz6fBQ84yqvfrsIdfOao0EzUDrRQdokUX4"
 
 
-class XPCog(commands.Cog):
+class XPset(commands.Cog):
 
   def __init__(self, bot: commands.Bot):
     self.bot = bot

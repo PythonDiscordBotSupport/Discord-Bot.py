@@ -2,6 +2,7 @@ from datetime import datetime, time, timezone
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+from google.oauth2.service_account import Credentials
 import gspread
 
 # Импорты из вашего конфига (config.py)
@@ -59,7 +60,7 @@ class LOAView(discord.ui.View):
     except discord.Forbidden:
       pass
 
-    # Обновляем Google Таблицу и передаем interaction для отправки ошибок в канал
+    # Обновляем Google Таблицу через Credentials
     await self.update_google_sheet(
         interaction, str(self.user.id), f"{self.start_date} - {self.end_date}"
     )
@@ -110,26 +111,29 @@ class LOAView(discord.ui.View):
     )
 
   async def update_google_sheet(self, interaction: discord.Interaction, user_id: str, date_range: str):
-    """Обновление таблицы с принудительным выводом типа и текста ошибки"""
+    """Обновление таблицы через Credentials для обхода PermissionError на Render"""
     try:
-      print("📂 [DEBUG] Подключаемся к сервисному аккаунту...")
-      gc = gspread.service_account(filename="/etc/secrets/service_account")
+      scopes = [
+          "https://www.googleapis.com/auth/spreadsheets",
+          "https://www.googleapis.com/auth/drive"
+      ]
       
-      print(f"📖 [DEBUG] Открываем таблицу {SPREADSHEET_ID}...")
+      creds = Credentials.from_service_account_file("/etc/secrets/service_account", scopes=scopes)
+      gc = gspread.authorize(creds)
+      
       sh = gc.open_by_key(SPREADSHEET_ID)
       worksheet = sh.sheet1
 
       cleaned_user_id = str(user_id).strip()
-      print(f"🔍 [DEBUG] Ищем ID '{cleaned_user_id}' в колонке 3...")
       cell = worksheet.find(cleaned_user_id, in_column=3)
       
       if cell:
         row = cell.row
-        worksheet.update_cell(row, 4, True)  # Столбец D - True
+        worksheet.update_cell(row, 4, True)  # Столбец D - True (чекбокс)
         worksheet.update_cell(row, 5, date_range)  # Столбец E - даты
-        print(f"✅ [DEBUG] Строка {row} успешно обновлена!")
+        print(f"✅ Успешно обновлена строка {row} для ID {cleaned_user_id}")
       else:
-        print(f"❌ [DEBUG] ID '{cleaned_user_id}' не найден в колонке C.")
+        print(f"❌ ID '{cleaned_user_id}' не найден в колонке C.")
         error_channel = interaction.client.get_channel(errors)
         if error_channel:
           all_ids = worksheet.col_values(3)
@@ -141,9 +145,8 @@ class LOAView(discord.ui.View):
     except Exception as e:
       error_type = type(e).__name__
       error_msg = str(e) or repr(e)
-      print(f"🚨 КРИТИЧЕСКАЯ ОШИБКА [{error_type}]: {error_msg}")
+      print(f"🚨 Ошибка Google Таблиц [{error_type}]: {error_msg}")
       
-      # Отправляем и тип, и текст ошибки в канал errors
       error_channel = interaction.client.get_channel(errors)
       if error_channel:
         await error_channel.send(
@@ -251,7 +254,13 @@ class LOACog(commands.Cog):
     today_str = datetime.now(timezone.utc).strftime("%d.%m")
 
     try:
-      gc = gspread.service_account(filename="/etc/secrets/service_account")
+      scopes = [
+          "https://www.googleapis.com/auth/spreadsheets",
+          "https://www.googleapis.com/auth/drive"
+      ]
+      creds = Credentials.from_service_account_file("/etc/secrets/service_account", scopes=scopes)
+      gc = gspread.authorize(creds)
+      
       sh = gc.open_by_key(SPREADSHEET_ID)
       worksheet = sh.sheet1
       rows = worksheet.get_all_values()

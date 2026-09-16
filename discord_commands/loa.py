@@ -362,7 +362,7 @@ class LOACog(commands.Cog):
                 log_channel = self.bot.get_channel(loa_logs_channel_id)
                 if log_channel:
                   await log_channel.send(
-                      f"<@1485230165830402168> User <@{user_id}> LOA ends today"
+                      f"<@&{human_resources}> User <@{user_id}> LOA ends today"
                       f" ({dates_str}). Status automatically reset."
                   )
 

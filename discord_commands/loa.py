@@ -313,7 +313,10 @@ class LOACog(commands.Cog):
         reason=reason,
     )
 
-    sent_message = await channel.send(embed=embed, view=view)
+    # Отправляем сообщение с пингом роли HR текстом перед embed
+    hr_role_ping = f"<@&{human_resources}>"
+    sent_message = await channel.send(content=hr_role_ping, embed=embed, view=view)
+    
     self.bot.add_view(view, message_id=sent_message.id)
 
     await interaction.response.send_message(
@@ -398,4 +401,4 @@ class LOACog(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(LOACog(bot))
-      
+                                                    

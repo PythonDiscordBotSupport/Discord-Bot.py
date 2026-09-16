@@ -65,16 +65,6 @@ class LOAView(discord.ui.View):
         interaction, str(self.user.id), f"{self.start_date} - {self.end_date}"
     )
 
-    for child in self.children:
-      child.disabled = True
-    embed = interaction.message.embeds[0]
-    embed.color = discord.Color.green()
-    embed.add_field(
-        name="Status", value=f"Approved by {interaction.user.mention}", inline=False
-    )
-
-    await interaction.message.edit(embed=embed, view=self)
-
     # 🟢 Отправка лога об ОДОБРЕНИИ в лог-канал
     log_channel = interaction.client.get_channel(loa_logs_channel_id)
     if log_channel:
@@ -88,9 +78,15 @@ class LOAView(discord.ui.View):
       log_embed.add_field(name="Period", value=f"{self.start_date} - {self.end_date} ({self.duration} days)", inline=False)
       log_embed.add_field(name="Reason", value=self.reason, inline=False)
       await log_channel.send(embed=log_embed)
+
+    # Удаляем сообщение с заявкой из канала заявок
+    try:
+      await interaction.message.delete()
+    except Exception:
+      pass
     
     await interaction.followup.send(
-        "✅ Request successfully accepted.", ephemeral=True
+        "✅ Request successfully accepted and logged.", ephemeral=True
     )
 
   @discord.ui.button(
@@ -110,16 +106,6 @@ class LOAView(discord.ui.View):
     except discord.Forbidden:
       pass
 
-    for child in self.children:
-      child.disabled = True
-    embed = interaction.message.embeds[0]
-    embed.color = discord.Color.red()
-    embed.add_field(
-        name="Status", value=f"Denied by {interaction.user.mention}", inline=False
-    )
-
-    await interaction.message.edit(embed=embed, view=self)
-
     # 🔴 Отправка лога об ОТКЛОНЕНИИ в лог-канал
     log_channel = interaction.client.get_channel(loa_logs_channel_id)
     if log_channel:
@@ -133,9 +119,15 @@ class LOAView(discord.ui.View):
       log_embed.add_field(name="Period", value=f"{self.start_date} - {self.end_date} ({self.duration} days)", inline=False)
       log_embed.add_field(name="Reason", value=self.reason, inline=False)
       await log_channel.send(embed=log_embed)
+
+    # Удаляем сообщение с заявкой из канала заявок
+    try:
+      await interaction.message.delete()
+    except Exception:
+      pass
     
     await interaction.followup.send(
-        "❌ Request denied.", ephemeral=True
+        "❌ Request denied and logged.", ephemeral=True
     )
 
   async def update_google_sheet(self, interaction: discord.Interaction, user_id: str, date_range: str):
@@ -209,46 +201,42 @@ class LOACog(commands.Cog):
         if message.author == self.bot.user and message.embeds:
           embed = message.embeds[0]
 
-          # Проверяем, есть ли статус (если нет — заявка ждет решения)
-          has_status = any(field.name == "Status" for field in embed.fields)
+          user_id = None
+          start_date = None
+          end_date = None
+          duration = None
+          reason = None
 
-          if not has_status:
-            user_id = None
-            start_date = None
-            end_date = None
-            duration = None
-            reason = None
+          for field in embed.fields:
+            if field.name == "User ID":
+              user_id = int(field.value)
+            elif field.name == "Start Date":
+              start_date = field.value
+            elif field.name == "End Date":
+              end_date = field.value
+            elif field.name == "Duration":
+              duration = int(field.value.split()[0])
+            elif field.name == "Reason":
+              reason = field.value
 
-            for field in embed.fields:
-              if field.name == "User ID":
-                user_id = int(field.value)
-              elif field.name == "Start Date":
-                start_date = field.value
-              elif field.name == "End Date":
-                end_date = field.value
-              elif field.name == "Duration":
-                duration = int(field.value.split()[0])
-              elif field.name == "Reason":
-                reason = field.value
+          if user_id and start_date and end_date and duration is not None and reason:
+            user = self.bot.get_user(user_id)
+            if not user:
+              try:
+                user = await self.bot.fetch_user(user_id)
+              except Exception:
+                continue
 
-            if user_id and start_date and end_date and duration is not None and reason:
-              user = self.bot.get_user(user_id)
-              if not user:
-                try:
-                  user = await self.bot.fetch_user(user_id)
-                except Exception:
-                  continue
-
-              if user:
-                view = LOAView(
-                    user=user,
-                    start_date=start_date,
-                    end_date=end_date,
-                    duration=duration,
-                    reason=reason,
-                )
-                self.bot.add_view(view, message_id=message.id)
-                restored_count += 1
+            if user:
+              view = LOAView(
+                  user=user,
+                  start_date=start_date,
+                  end_date=end_date,
+                  duration=duration,
+                  reason=reason,
+              )
+              self.bot.add_view(view, message_id=message.id)
+              restored_count += 1
 
       print(f"✅ Успешно восстановлено активных LOA заявок: {restored_count}")
 
@@ -276,7 +264,6 @@ class LOACog(commands.Cog):
       end_date: str,
       reason: str,
   ):
-    # Защита от рестартов удалена, команда доступна 24/7
     now_utc = datetime.now(timezone.utc)
 
     # Parse dates and calculate duration
@@ -327,7 +314,6 @@ class LOACog(commands.Cog):
     )
 
     sent_message = await channel.send(embed=embed, view=view)
-    # Регистрируем View для персистентности сгенерированного сообщения сразу
     self.bot.add_view(view, message_id=sent_message.id)
 
     await interaction.response.send_message(
@@ -406,4 +392,4 @@ class LOACog(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(LOACog(bot))
-      
+    

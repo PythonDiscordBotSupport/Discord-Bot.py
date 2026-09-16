@@ -321,8 +321,8 @@ class LOACog(commands.Cog):
         ephemeral=True,
     )
 
-  # Background task runs strictly at 11:45 UTC every day
-  @tasks.loop(time=time(hour=11, minute=45, tzinfo=timezone.utc))
+  # Background task runs strictly at 13:00 UTC every day
+  @tasks.loop(time=time(hour=13, minute=0, tzinfo=timezone.utc))
   async def check_loa_expiry(self):
     today_str = datetime.now(timezone.utc).strftime("%d.%m")
 
@@ -398,4 +398,4 @@ class LOACog(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(LOACog(bot))
-                               
+      

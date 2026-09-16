@@ -59,8 +59,10 @@ class LOAView(discord.ui.View):
     except discord.Forbidden:
       pass
 
-    # Обновляем Google Таблицу (теперь с полной отладкой в консоли)
-    self.update_google_sheet(str(self.user.id), f"{self.start_date} - {self.end_date}")
+    # Обновляем Google Таблицу и передаем interaction для отправки ошибок в канал
+    await self.update_google_sheet(
+        interaction, str(self.user.id), f"{self.start_date} - {self.end_date}"
+    )
 
     for child in self.children:
       child.disabled = True
@@ -72,7 +74,6 @@ class LOAView(discord.ui.View):
 
     await interaction.message.edit(embed=embed, view=self)
     
-    # Используем followup, так как был сделан defer()
     await interaction.followup.send(
         "✅ Request successfully accepted.", ephemeral=True
     )
@@ -104,47 +105,44 @@ class LOAView(discord.ui.View):
 
     await interaction.message.edit(embed=embed, view=self)
     
-    # Используем followup, так как был сделан defer()
     await interaction.followup.send(
         "❌ Request denied.", ephemeral=True
     )
 
-  def update_google_sheet(self, user_id: str, date_range: str):
-    """Обновление Google Таблицы с подробной диагностикой ошибок"""
-    print(f"\n--- [GOOGLE SHEETS DEBUG] Начало обновления для ID: {user_id} ---")
+  async def update_google_sheet(self, interaction: discord.Interaction, user_id: str, date_range: str):
+    """Обновление таблицы с отправкой ошибок прямо в Discord-канал errors"""
     try:
-      print("📂 Подключаемся к Google API через /etc/secrets/service_account...")
       gc = gspread.service_account(filename="/etc/secrets/service_account")
-      
-      print(f"📖 Открываем таблицу по ID: {SPREADSHEET_ID}...")
       sh = gc.open_by_key(SPREADSHEET_ID)
       worksheet = sh.sheet1
-      print(f"📄 Рабочий лист '{worksheet.title}' успешно открыт.")
 
       cleaned_user_id = str(user_id).strip()
-      print(f"🔍 Ищем точное совпадение '{cleaned_user_id}' в колонке C (индекс 3)...")
-      
       cell = worksheet.find(cleaned_user_id, in_column=3)
       
       if cell:
         row = cell.row
-        print(f"✅ УСПЕХ: ID найден в строке {row}!")
-        
         worksheet.update_cell(row, 4, True)  # Столбец D - True (чекбокс)
-        print(f"✔️ Столбец D (строка {row}) обновлен на True.")
-        
         worksheet.update_cell(row, 5, date_range)  # Столбец E - даты
-        print(f"✔️ Столбец E (строка {row}) обновлен на диапазон: {date_range}.")
-        print("🎉 [GOOGLE SHEETS DEBUG] Запись полностью завершена!")
+        print(f"✅ Успешно обновлена строка {row} для ID {cleaned_user_id}")
       else:
-        print(f"❌ ОШИБКА: ID '{cleaned_user_id}' НЕ НАЙДЕН в столбце C!")
-        print("📋 Получаем список всех значений из колонки C для проверки:")
-        all_ids = worksheet.col_values(3)
-        print(f"Содержимое колонки C: {all_ids}")
+        # Если ID не найден, отправляем предупреждение в канал errors
+        error_channel = interaction.client.get_channel(errors)
+        if error_channel:
+          all_ids = worksheet.col_values(3)
+          await error_channel.send(
+              f"⚠️ **LOA Warning:** ID `{cleaned_user_id}` не найден в колонке C!\n"
+              f"📋 Список ID в таблице: `{all_ids}`"
+          )
+        print(f"❌ ID '{cleaned_user_id}' не найден в колонке C.")
         
     except Exception as e:
-      print(f"🚨 КРИТИЧЕСКАЯ ОШИБКА в update_google_sheet: {type(e).__name__} - {e}")
-    print("--- [GOOGLE SHEETS DEBUG] Конец операции ---\n")
+      print(f"🚨 Ошибка Google Таблиц: {e}")
+      # Отправляем техническую ошибку в канал errors
+      error_channel = interaction.client.get_channel(errors)
+      if error_channel:
+        await error_channel.send(
+            f"🚨 **Google Sheets Error in LOA:**\n```python\n{e}\n```"
+        )
 
 
 class LOACog(commands.Cog):

@@ -74,6 +74,20 @@ class LOAView(discord.ui.View):
     )
 
     await interaction.message.edit(embed=embed, view=self)
+
+    # 🟢 Отправка лога об ОДОБРЕНИИ в лог-канал
+    log_channel = interaction.client.get_channel(loa_logs_channel_id)
+    if log_channel:
+      log_embed = discord.Embed(
+          title="✅ LOA Request Approved",
+          color=discord.Color.green(),
+          timestamp=datetime.now(timezone.utc),
+      )
+      log_embed.add_field(name="User", value=self.user.mention, inline=True)
+      log_embed.add_field(name="Reviewer (HR)", value=interaction.user.mention, inline=True)
+      log_embed.add_field(name="Period", value=f"{self.start_date} - {self.end_date} ({self.duration} days)", inline=False)
+      log_embed.add_field(name="Reason", value=self.reason, inline=False)
+      await log_channel.send(embed=log_embed)
     
     await interaction.followup.send(
         "✅ Request successfully accepted.", ephemeral=True
@@ -105,6 +119,20 @@ class LOAView(discord.ui.View):
     )
 
     await interaction.message.edit(embed=embed, view=self)
+
+    # 🔴 Отправка лога об ОТКЛОНЕНИИ в лог-канал
+    log_channel = interaction.client.get_channel(loa_logs_channel_id)
+    if log_channel:
+      log_embed = discord.Embed(
+          title="❌ LOA Request Denied",
+          color=discord.Color.red(),
+          timestamp=datetime.now(timezone.utc),
+      )
+      log_embed.add_field(name="User", value=self.user.mention, inline=True)
+      log_embed.add_field(name="Reviewer (HR)", value=interaction.user.mention, inline=True)
+      log_embed.add_field(name="Period", value=f"{self.start_date} - {self.end_date} ({self.duration} days)", inline=False)
+      log_embed.add_field(name="Reason", value=self.reason, inline=False)
+      await log_channel.send(embed=log_embed)
     
     await interaction.followup.send(
         "❌ Request denied.", ephemeral=True
@@ -319,4 +347,4 @@ class LOACog(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(LOACog(bot))
-    
+          

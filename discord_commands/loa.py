@@ -110,22 +110,26 @@ class LOAView(discord.ui.View):
     )
 
   async def update_google_sheet(self, interaction: discord.Interaction, user_id: str, date_range: str):
-    """Обновление таблицы с отправкой ошибок прямо в Discord-канал errors"""
+    """Обновление таблицы с принудительным выводом типа и текста ошибки"""
     try:
+      print("📂 [DEBUG] Подключаемся к сервисному аккаунту...")
       gc = gspread.service_account(filename="/etc/secrets/service_account")
+      
+      print(f"📖 [DEBUG] Открываем таблицу {SPREADSHEET_ID}...")
       sh = gc.open_by_key(SPREADSHEET_ID)
       worksheet = sh.sheet1
 
       cleaned_user_id = str(user_id).strip()
+      print(f"🔍 [DEBUG] Ищем ID '{cleaned_user_id}' в колонке 3...")
       cell = worksheet.find(cleaned_user_id, in_column=3)
       
       if cell:
         row = cell.row
-        worksheet.update_cell(row, 4, True)  # Столбец D - True (чекбокс)
+        worksheet.update_cell(row, 4, True)  # Столбец D - True
         worksheet.update_cell(row, 5, date_range)  # Столбец E - даты
-        print(f"✅ Успешно обновлена строка {row} для ID {cleaned_user_id}")
+        print(f"✅ [DEBUG] Строка {row} успешно обновлена!")
       else:
-        # Если ID не найден, отправляем предупреждение в канал errors
+        print(f"❌ [DEBUG] ID '{cleaned_user_id}' не найден в колонке C.")
         error_channel = interaction.client.get_channel(errors)
         if error_channel:
           all_ids = worksheet.col_values(3)
@@ -133,15 +137,19 @@ class LOAView(discord.ui.View):
               f"⚠️ **LOA Warning:** ID `{cleaned_user_id}` не найден в колонке C!\n"
               f"📋 Список ID в таблице: `{all_ids}`"
           )
-        print(f"❌ ID '{cleaned_user_id}' не найден в колонке C.")
         
     except Exception as e:
-      print(f"🚨 Ошибка Google Таблиц: {e}")
-      # Отправляем техническую ошибку в канал errors
+      error_type = type(e).__name__
+      error_msg = str(e) or repr(e)
+      print(f"🚨 КРИТИЧЕСКАЯ ОШИБКА [{error_type}]: {error_msg}")
+      
+      # Отправляем и тип, и текст ошибки в канал errors
       error_channel = interaction.client.get_channel(errors)
       if error_channel:
         await error_channel.send(
-            f"🚨 **Google Sheets Error in LOA:**\n```python\n{e}\n```"
+            f"🚨 **Google Sheets Error in LOA:**\n"
+            f"**Type:** `{error_type}`\n"
+            f"**Error:** ```python\n{error_msg}\n```"
         )
 
 

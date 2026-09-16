@@ -59,7 +59,7 @@ class LOAView(discord.ui.View):
     except discord.Forbidden:
       pass
 
-    # Обновляем Google Таблицу
+    # Обновляем Google Таблицу (теперь с полной отладкой в консоли)
     self.update_google_sheet(str(self.user.id), f"{self.start_date} - {self.end_date}")
 
     for child in self.children:
@@ -110,19 +110,41 @@ class LOAView(discord.ui.View):
     )
 
   def update_google_sheet(self, user_id: str, date_range: str):
-    """Обновление Google Таблицы с использованием файла сервисного аккаунта"""
+    """Обновление Google Таблицы с подробной диагностикой ошибок"""
+    print(f"\n--- [GOOGLE SHEETS DEBUG] Начало обновления для ID: {user_id} ---")
     try:
+      print("📂 Подключаемся к Google API через /etc/secrets/service_account...")
       gc = gspread.service_account(filename="/etc/secrets/service_account")
+      
+      print(f"📖 Открываем таблицу по ID: {SPREADSHEET_ID}...")
       sh = gc.open_by_key(SPREADSHEET_ID)
       worksheet = sh.sheet1
+      print(f"📄 Рабочий лист '{worksheet.title}' успешно открыт.")
 
-      cell = worksheet.find(user_id, in_column=3)
+      cleaned_user_id = str(user_id).strip()
+      print(f"🔍 Ищем точное совпадение '{cleaned_user_id}' в колонке C (индекс 3)...")
+      
+      cell = worksheet.find(cleaned_user_id, in_column=3)
+      
       if cell:
         row = cell.row
+        print(f"✅ УСПЕХ: ID найден в строке {row}!")
+        
         worksheet.update_cell(row, 4, True)  # Столбец D - True (чекбокс)
+        print(f"✔️ Столбец D (строка {row}) обновлен на True.")
+        
         worksheet.update_cell(row, 5, date_range)  # Столбец E - даты
+        print(f"✔️ Столбец E (строка {row}) обновлен на диапазон: {date_range}.")
+        print("🎉 [GOOGLE SHEETS DEBUG] Запись полностью завершена!")
+      else:
+        print(f"❌ ОШИБКА: ID '{cleaned_user_id}' НЕ НАЙДЕН в столбце C!")
+        print("📋 Получаем список всех значений из колонки C для проверки:")
+        all_ids = worksheet.col_values(3)
+        print(f"Содержимое колонки C: {all_ids}")
+        
     except Exception as e:
-      print(f"Error updating Google Sheet: {e}")
+      print(f"🚨 КРИТИЧЕСКАЯ ОШИБКА в update_google_sheet: {type(e).__name__} - {e}")
+    print("--- [GOOGLE SHEETS DEBUG] Конец операции ---\n")
 
 
 class LOACog(commands.Cog):
@@ -282,4 +304,4 @@ class LOACog(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(LOACog(bot))
-      
+    

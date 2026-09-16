@@ -14,6 +14,8 @@ human_resources = 1487518138974208142
 notifications = 1507853423117336691
 errors = 1500591818532978909
 progression = 1500590900902887575
+loa_logs_channel_id = 1507853423117336691
+loa_apps_channel_id = 1507853423117336691
 # Voice Channels IDs
 division_name = ""
 division_leader = ""

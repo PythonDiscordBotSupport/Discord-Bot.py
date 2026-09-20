@@ -7,7 +7,9 @@ import gspread
 
 # Импорты из вашего конфига (config.py)
 from config import (
-    errors,  # ID канала для логирования ошибок
+    errors,         # ID канала для логирования ошибок
+    human_resources, # ID роли HR
+    strike_tracker,  # ID канала для логов страйков
 )
 
 # ID вашей Google Таблицы
@@ -22,6 +24,16 @@ class StrikeCog(commands.Cog):
   # Создаем единую группу команд /strike
   strike_group = app_commands.Group(name="strike", description="Manage member strikes")
 
+  async def _check_hr_role(self, interaction: discord.Interaction) -> bool:
+    """Вспомогательная проверка роли HR"""
+    role = interaction.guild.get_role(human_resources)
+    if not role or role not in interaction.user.roles:
+      await interaction.response.send_message(
+          "❌ You do not have permission to use this command.", ephemeral=True
+      )
+      return False
+    return True
+
   async def _process_strike_update(
       self,
       interaction: discord.Interaction,
@@ -30,7 +42,7 @@ class StrikeCog(commands.Cog):
       reason: str,
       set_value: str = None,
   ):
-    """Единая логика для обновления страйков в колонке J"""
+    """Единая логика для обновления страйков в колонке J и отправки логов"""
     await interaction.response.defer(ephemeral=True)
     user_id_str = str(member.id).strip()
 
@@ -63,7 +75,7 @@ class StrikeCog(commands.Cog):
       current_val_raw = worksheet.cell(row, 10).value
       previous_amount = str(current_val_raw).strip() if current_val_raw and str(current_val_raw).strip() != "" else "None"
 
-      # Логика изменения страйков в колонке J (10)
+      # Логика изменения страйков в колонке J (10) и параметры для логов
       if mode == "add":
         if previous_amount in ["None", ""]:
           new_amount = "Strike 1"
@@ -73,7 +85,7 @@ class StrikeCog(commands.Cog):
           new_amount = "Removal"
         else:
           new_amount = "Removal"
-        action_text = f"added a strike to"
+        title, color, action_text = "⚠️ Strike Added", discord.Color.red(), f"added a strike to"
 
       elif mode == "remove":
         if previous_amount == "Removal":
@@ -82,17 +94,34 @@ class StrikeCog(commands.Cog):
           new_amount = "Strike 1"
         else:
           new_amount = ""
-        action_text = f"removed a strike from"
+        title, color, action_text = "🛡️ Strike Removed", discord.Color.green(), f"removed a strike from"
 
       else:  # set
         new_amount = set_value if set_value else ""
-        action_text = f"set strikes for"
+        title, color, action_text = "⚙️ Strike Status Set", discord.Color.blue(), f"set strike status for"
 
       # Обновляем колонку J (10)
       worksheet.update_cell(row, 10, new_amount)
       display_new = new_amount if new_amount != "" else "None"
+      display_prev = previous_amount if previous_amount != "" else "None"
 
-      msg = f"✅ Successfully {action_text} {member.mention}.\n📊 Previous: `{previous_amount}` | New: `{display_new}`"
+      # Отправка лога в канал strike_tracker
+      log_channel = self.bot.get_channel(strike_tracker)
+      if log_channel:
+        log_embed = discord.Embed(
+            title=title,
+            color=color,
+            timestamp=datetime.now(timezone.utc),
+        )
+        log_embed.add_field(name="Officer", value=member.mention, inline=False)
+        log_embed.add_field(name="Human Resources", value=interaction.user.mention, inline=False)
+        log_embed.add_field(name="New Status", value=display_new, inline=False)
+        log_embed.add_field(name="Previous Status", value=display_prev, inline=False)
+        log_embed.add_field(name="Reason", value=reason, inline=False)
+        
+        await log_channel.send(embed=log_embed)
+
+      msg = f"✅ Successfully {action_text} {member.mention}.\n📊 Previous: `{display_prev}` | New: `{display_new}`"
       await interaction.followup.send(msg, ephemeral=True)
 
     except Exception as e:
@@ -115,11 +144,13 @@ class StrikeCog(commands.Cog):
   @strike_group.command(name="add", description="Add a strike to a member")
   @app_commands.describe(member="The member to add a strike to", reason="Reason for the strike")
   async def strike_add(self, interaction: discord.Interaction, member: discord.Member, reason: str):
+    if not await self._check_hr_role(interaction): return
     await self._process_strike_update(interaction, member, "add", reason)
 
   @strike_group.command(name="remove", description="Remove a strike from a member")
   @app_commands.describe(member="The member to remove a strike from", reason="Reason for removal")
   async def strike_remove(self, interaction: discord.Interaction, member: discord.Member, reason: str):
+    if not await self._check_hr_role(interaction): return
     await self._process_strike_update(interaction, member, "remove", reason)
 
   @strike_group.command(name="set", description="Set a specific strike status for a member")
@@ -131,6 +162,7 @@ class StrikeCog(commands.Cog):
       app_commands.Choice(name="Removal", value="Removal"),
   ])
   async def strike_set(self, interaction: discord.Interaction, member: discord.Member, status: app_commands.Choice[str], reason: str):
+    if not await self._check_hr_role(interaction): return
     await self._process_strike_update(interaction, member, "set", reason, set_value=status.value)
 
 

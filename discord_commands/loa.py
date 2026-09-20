@@ -1,4 +1,5 @@
 from datetime import datetime, time, timezone
+import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -43,95 +44,8 @@ class LOAView(discord.ui.View):
     )
     return False
 
-  @discord.ui.button(
-      label="Accept", style=discord.ButtonStyle.green, custom_id="loa_accept"
-  )
-  async def accept_callback(
-      self, interaction: discord.Interaction, button: discord.ui.Button
-  ):
-    # Предотвращаем таймаут интеракции (ошибка 10062)
-    await interaction.response.defer(ephemeral=True)
-
-    try:
-      await self.user.send(
-          f"Your LOA request ({self.start_date} - {self.end_date}) has been"
-          " **approved**!"
-      )
-    except discord.Forbidden:
-      pass
-
-    # Обновляем Google Таблицу через Credentials
-    await self.update_google_sheet(
-        interaction, str(self.user.id), f"{self.start_date} - {self.end_date}"
-    )
-
-    # 🟢 Отправка лога об ОДОБРЕНИИ в лог-канал
-    log_channel = interaction.client.get_channel(loa_logs_channel_id)
-    if log_channel:
-      log_embed = discord.Embed(
-          title="✅ LOA Request Approved",
-          color=discord.Color.green(),
-          timestamp=datetime.now(timezone.utc),
-      )
-      log_embed.add_field(name="User", value=self.user.mention, inline=True)
-      log_embed.add_field(name="Reviewer (HR)", value=interaction.user.mention, inline=True)
-      log_embed.add_field(name="Period", value=f"{self.start_date} - {self.end_date} ({self.duration} days)", inline=False)
-      log_embed.add_field(name="Reason", value=self.reason, inline=False)
-      await log_channel.send(embed=log_embed)
-
-    # Удаляем сообщение с заявкой из канала заявок
-    try:
-      await interaction.message.delete()
-    except Exception:
-      pass
-    
-    await interaction.followup.send(
-        "✅ Request successfully accepted and logged.", ephemeral=True
-    )
-
-  @discord.ui.button(
-      label="Deny", style=discord.ButtonStyle.red, custom_id="loa_deny"
-  )
-  async def deny_callback(
-      self, interaction: discord.Interaction, button: discord.ui.Button
-  ):
-    # Предотвращаем таймаут интеракции (ошибка 10062)
-    await interaction.response.defer(ephemeral=True)
-
-    try:
-      await self.user.send(
-          f"Your LOA request ({self.start_date} - {self.end_date}) has been"
-          " **denied**."
-      )
-    except discord.Forbidden:
-      pass
-
-    # 🔴 Отправка лога об ОТКЛОНЕНИИ в лог-канал
-    log_channel = interaction.client.get_channel(loa_logs_channel_id)
-    if log_channel:
-      log_embed = discord.Embed(
-          title="❌ LOA Request Denied",
-          color=discord.Color.red(),
-          timestamp=datetime.now(timezone.utc),
-      )
-      log_embed.add_field(name="User", value=self.user.mention, inline=True)
-      log_embed.add_field(name="Reviewer (HR)", value=interaction.user.mention, inline=True)
-      log_embed.add_field(name="Period", value=f"{self.start_date} - {self.end_date} ({self.duration} days)", inline=False)
-      log_embed.add_field(name="Reason", value=self.reason, inline=False)
-      await log_channel.send(embed=log_embed)
-
-    # Удаляем сообщение с заявкой из канала заявок
-    try:
-      await interaction.message.delete()
-    except Exception:
-      pass
-    
-    await interaction.followup.send(
-        "❌ Request denied and logged.", ephemeral=True
-    )
-
-  async def update_google_sheet(self, interaction: discord.Interaction, user_id: str, date_range: str):
-    """Обновление таблицы через Credentials для обхода PermissionError на Render"""
+  def update_google_sheet_sync(self, user_id: str, date_range: str, client_bot = None):
+    """Синхронное обновление таблицы (вызывается в отдельном потоке, чтобы не морозить бота)"""
     try:
       scopes = [
           "https://www.googleapis.com/auth/spreadsheets",
@@ -154,26 +68,109 @@ class LOAView(discord.ui.View):
         print(f"✅ Успешно обновлена строка {row} для ID {cleaned_user_id}")
       else:
         print(f"❌ ID '{cleaned_user_id}' не найден в колонке C.")
-        error_channel = interaction.client.get_channel(errors)
-        if error_channel:
-          all_ids = worksheet.col_values(3)
-          await error_channel.send(
-              f"⚠️ **LOA Warning:** ID `{cleaned_user_id}` не найден в колонке C!\n"
-              f"📋 Список ID в таблице: `{all_ids}`"
-          )
         
     except Exception as e:
       error_type = type(e).__name__
       error_msg = str(e) or repr(e)
       print(f"🚨 Ошибка Google Таблиц [{error_type}]: {error_msg}")
-      
+      raise e
+
+  @discord.ui.button(
+      label="Accept", style=discord.ButtonStyle.green, custom_id="loa_accept"
+  )
+  async def accept_callback(
+      self, interaction: discord.Interaction, button: discord.ui.Button
+  ):
+    # Предотвращаем таймаут интеракции (ошибка 10062)
+    await interaction.response.defer(ephemeral=True)
+
+    date_range = f"{self.start_date} - {self.end_date}"
+    user_id_str = str(self.user.id)
+
+    # 1. Задачи для параллельного выполнения (asyncio.gather)
+    sheet_task = asyncio.to_thread(self.update_google_sheet_sync, user_id_str, date_range)
+    dm_task = self.user.send(f"Your LOA request ({date_range}) has been **approved**!")
+    delete_task = interaction.message.delete()
+
+    log_channel = interaction.client.get_channel(loa_logs_channel_id)
+    log_task = None
+    if log_channel:
+      log_embed = discord.Embed(
+          title="✅ LOA Request Approved",
+          color=discord.Color.green(),
+          timestamp=datetime.now(timezone.utc),
+      )
+      log_embed.add_field(name="User", value=self.user.mention, inline=True)
+      log_embed.add_field(name="Reviewer (HR)", value=interaction.user.mention, inline=True)
+      log_embed.add_field(name="Period", value=f"{date_range} ({self.duration} days)", inline=False)
+      log_embed.add_field(name="Reason", value=self.reason, inline=False)
+      log_task = log_channel.send(embed=log_embed)
+
+    # Собираем все задачи в один список
+    tasks_list = [sheet_task, dm_task, delete_task]
+    if log_task:
+      tasks_list.append(log_task)
+
+    # Запускаем всё одновременно и ждем окончания
+    results = await asyncio.gather(*tasks_list, return_exceptions=True)
+
+    # Проверяем, не было ли ошибки с закрытыми ЛС
+    if isinstance(results[1], discord.Forbidden):
+      pass
+
+    # Если вдруг таблица выдала ошибку — логируем её в канал ошибок
+    if isinstance(results[0], Exception):
       error_channel = interaction.client.get_channel(errors)
       if error_channel:
         await error_channel.send(
-            f"🚨 **Google Sheets Error in LOA:**\n"
-            f"**Type:** `{error_type}`\n"
-            f"**Error:** ```python\n{error_msg}\n```"
+            f"🚨 **Google Sheets Error in LOA:**\n```python\n{str(results[0])}\n```"
         )
+
+    await interaction.followup.send(
+        "✅ Request successfully accepted and logged.", ephemeral=True
+    )
+
+  @discord.ui.button(
+      label="Deny", style=discord.ButtonStyle.red, custom_id="loa_deny"
+  )
+  async def deny_callback(
+      self, interaction: discord.Interaction, button: discord.ui.Button
+  ):
+    # Предотвращаем таймаут интеракции (ошибка 10062)
+    await interaction.response.defer(ephemeral=True)
+
+    date_range = f"{self.start_date} - {self.end_date}"
+
+    # Параллельные задачи для отклонения заявки
+    dm_task = self.user.send(f"Your LOA request ({date_range}) has been **denied**.")
+    delete_task = interaction.message.delete()
+
+    log_channel = interaction.client.get_channel(loa_logs_channel_id)
+    log_task = None
+    if log_channel:
+      log_embed = discord.Embed(
+          title="❌ LOA Request Denied",
+          color=discord.Color.red(),
+          timestamp=datetime.now(timezone.utc),
+      )
+      log_embed.add_field(name="User", value=self.user.mention, inline=True)
+      log_embed.add_field(name="Reviewer (HR)", value=interaction.user.mention, inline=True)
+      log_embed.add_field(name="Period", value=f"{date_range} ({self.duration} days)", inline=False)
+      log_embed.add_field(name="Reason", value=self.reason, inline=False)
+      log_task = log_channel.send(embed=log_embed)
+
+    tasks_list = [dm_task, delete_task]
+    if log_task:
+      tasks_list.append(log_task)
+
+    results = await asyncio.gather(*tasks_list, return_exceptions=True)
+
+    if isinstance(results[0], discord.Forbidden):
+      pass
+    
+    await interaction.followup.send(
+        "❌ Request denied and logged.", ephemeral=True
+    )
 
 
 class LOACog(commands.Cog):
@@ -313,7 +310,6 @@ class LOACog(commands.Cog):
         reason=reason,
     )
 
-    # Отправляем сообщение с пингом роли HR текстом перед embed
     hr_role_ping = f"<@&{human_resources}>"
     sent_message = await channel.send(content=hr_role_ping, embed=embed, view=view)
     
@@ -401,4 +397,4 @@ class LOACog(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(LOACog(bot))
-                                                    
+      

@@ -45,7 +45,6 @@ class StrikeCog(commands.Cog):
       sh = gc.open_by_key(SPREADSHEET_ID)
       worksheet = sh.sheet1
 
-      # Ищем ID пользователя в колонке C
       cell = worksheet.find(user_id_str, in_column=3)
 
       if not cell:
@@ -62,7 +61,7 @@ class StrikeCog(commands.Cog):
 
       row = cell.row
 
-      # Получаем текущее значение страйков из колонки J (10-я колонка)
+      # Колонка J — это 10-й столбец (A=1, B=2, C=3, D=4, E=5, F=6, G=7, H=8, I=9, J=10)
       current_strikes_raw = worksheet.cell(row, 10).value
       try:
         previous_amount = int(current_strikes_raw) if current_strikes_raw and str(current_strikes_raw).strip() != "" else 0
@@ -72,21 +71,20 @@ class StrikeCog(commands.Cog):
       # Вычисляем новое значение в зависимости от команды
       if mode == "add":
         new_amount = previous_amount + amount
-        action_text = f" added **{amount}** strike(s) to"
+        action_text = f"added **{amount} strike(s)** to"
       elif mode == "remove":
-        new_amount = max(0, previous_amount - amount)  # Страйки обычно не уходят в минус
-        action_text = f" removed **{amount}** strike(s) from"
+        new_amount = previous_amount - amount
+        action_text = f"removed **{amount} strike(s)** from"
       else:  # set
         new_amount = amount
-        action_text = f" set strikes for"
+        action_text = f"set strikes for"
 
-      # Обновляем ячейку в колонке J
       worksheet.update_cell(row, 10, new_amount)
 
       if mode == "set":
-        msg = f"✅ Successfully set strikes for {member.mention} to **{amount}**.\n📊 Previous: `{previous_amount}` | New: `{new_amount}` | Reason: {reason}"
+        msg = f"✅ Successfully set strikes for {member.mention} to **{amount}**.\n📊 Previous: `{previous_amount}` | New: `{new_amount}`\n📝 Reason: {reason}"
       else:
-        msg = f"✅ Successfully{action_text} {member.mention}.\n📊 Previous: `{previous_amount}` | New: `{new_amount}` | Reason: {reason}"
+        msg = f"✅ Successfully {action_text} {member.mention}.\n📊 Previous: `{previous_amount}` | New: `{new_amount}`\n📝 Reason: {reason}"
 
       await interaction.followup.send(msg, ephemeral=True)
 
@@ -113,15 +111,16 @@ class StrikeCog(commands.Cog):
     await self._process_strike_update(interaction, member, amount, "add", reason)
 
   @strike_group.command(name="remove", description="Remove strikes from a member")
-  @app_commands.describe(member="The member to remove strikes from", amount="Number of strikes to remove", reason="Reason for removal")
+  @app_commands.describe(member="The member to remove strikes from", amount="Number of strikes to remove", reason="Reason for removing strikes")
   async def strike_remove(self, interaction: discord.Interaction, member: discord.Member, amount: int, reason: str):
     await self._process_strike_update(interaction, member, amount, "remove", reason)
 
   @strike_group.command(name="set", description="Set a specific strike amount for a member")
-  @app_commands.describe(member="The member to set strikes for", amount="The exact number of strikes", reason="Reason for setting strikes")
+  @app_commands.describe(member="The member to set strikes for", amount="The exact number of strikes to set", reason="Reason for setting strikes")
   async def strike_set(self, interaction: discord.Interaction, member: discord.Member, amount: int, reason: str):
     await self._process_strike_update(interaction, member, amount, "set", reason)
 
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(StrikeCog(bot))
+    

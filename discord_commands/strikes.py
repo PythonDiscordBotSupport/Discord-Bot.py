@@ -26,11 +26,11 @@ class StrikeCog(commands.Cog):
       self,
       interaction: discord.Interaction,
       member: discord.Member,
-      amount: int,
       mode: str,
       reason: str,
+      set_value: str = None,
   ):
-    """Единая логика для обновления таблицы страйков (колонка J)"""
+    """Единая логика для обновления страйков в колонке J"""
     await interaction.response.defer(ephemeral=True)
     user_id_str = str(member.id).strip()
 
@@ -60,32 +60,39 @@ class StrikeCog(commands.Cog):
         return
 
       row = cell.row
+      current_val_raw = worksheet.cell(row, 10).value
+      previous_amount = str(current_val_raw).strip() if current_val_raw and str(current_val_raw).strip() != "" else "None"
 
-      # Колонка J — это 10-й столбец (A=1, B=2, C=3, D=4, E=5, F=6, G=7, H=8, I=9, J=10)
-      current_strikes_raw = worksheet.cell(row, 10).value
-      try:
-        previous_amount = int(current_strikes_raw) if current_strikes_raw and str(current_strikes_raw).strip() != "" else 0
-      except ValueError:
-        previous_amount = 0
-
-      # Вычисляем новое значение в зависимости от команды
+      # Логика изменения страйков в колонке J (10)
       if mode == "add":
-        new_amount = previous_amount + amount
-        action_text = f"added **{amount} strike(s)** to"
+        if previous_amount in ["None", ""]:
+          new_amount = "Strike 1"
+        elif previous_amount == "Strike 1":
+          new_amount = "Strike 2"
+        elif previous_amount == "Strike 2":
+          new_amount = "Removal"
+        else:
+          new_amount = "Removal"
+        action_text = f"added a strike to"
+
       elif mode == "remove":
-        new_amount = previous_amount - amount
-        action_text = f"removed **{amount} strike(s)** from"
+        if previous_amount == "Removal":
+          new_amount = "Strike 2"
+        elif previous_amount == "Strike 2":
+          new_amount = "Strike 1"
+        else:
+          new_amount = ""
+        action_text = f"removed a strike from"
+
       else:  # set
-        new_amount = amount
+        new_amount = set_value if set_value else ""
         action_text = f"set strikes for"
 
+      # Обновляем колонку J (10)
       worksheet.update_cell(row, 10, new_amount)
+      display_new = new_amount if new_amount != "" else "None"
 
-      if mode == "set":
-        msg = f"✅ Successfully set strikes for {member.mention} to **{amount}**.\n📊 Previous: `{previous_amount}` | New: `{new_amount}`\n📝 Reason: {reason}"
-      else:
-        msg = f"✅ Successfully {action_text} {member.mention}.\n📊 Previous: `{previous_amount}` | New: `{new_amount}`\n📝 Reason: {reason}"
-
+      msg = f"✅ Successfully {action_text} {member.mention}.\n📊 Previous: `{previous_amount}` | New: `{display_new}`"
       await interaction.followup.send(msg, ephemeral=True)
 
     except Exception as e:
@@ -105,20 +112,26 @@ class StrikeCog(commands.Cog):
           "❌ An error occurred while updating the Google Sheet.", ephemeral=True
       )
 
-  @strike_group.command(name="add", description="Add strikes to a member")
-  @app_commands.describe(member="The member who receives strikes", amount="Number of strikes to add", reason="Reason for the strike")
-  async def strike_add(self, interaction: discord.Interaction, member: discord.Member, amount: int, reason: str):
-    await self._process_strike_update(interaction, member, amount, "add", reason)
+  @strike_group.command(name="add", description="Add a strike to a member")
+  @app_commands.describe(member="The member to add a strike to", reason="Reason for the strike")
+  async def strike_add(self, interaction: discord.Interaction, member: discord.Member, reason: str):
+    await self._process_strike_update(interaction, member, "add", reason)
 
-  @strike_group.command(name="remove", description="Remove strikes from a member")
-  @app_commands.describe(member="The member to remove strikes from", amount="Number of strikes to remove", reason="Reason for removing strikes")
-  async def strike_remove(self, interaction: discord.Interaction, member: discord.Member, amount: int, reason: str):
-    await self._process_strike_update(interaction, member, amount, "remove", reason)
+  @strike_group.command(name="remove", description="Remove a strike from a member")
+  @app_commands.describe(member="The member to remove a strike from", reason="Reason for removal")
+  async def strike_remove(self, interaction: discord.Interaction, member: discord.Member, reason: str):
+    await self._process_strike_update(interaction, member, "remove", reason)
 
-  @strike_group.command(name="set", description="Set a specific strike amount for a member")
-  @app_commands.describe(member="The member to set strikes for", amount="The exact number of strikes to set", reason="Reason for setting strikes")
-  async def strike_set(self, interaction: discord.Interaction, member: discord.Member, amount: int, reason: str):
-    await self._process_strike_update(interaction, member, amount, "set", reason)
+  @strike_group.command(name="set", description="Set a specific strike status for a member")
+  @app_commands.describe(member="The member to set strikes for", status="Strike status", reason="Reason for setting")
+  @app_commands.choices(status=[
+      app_commands.Choice(name="None (Clear)", value=""),
+      app_commands.Choice(name="Strike 1", value="Strike 1"),
+      app_commands.Choice(name="Strike 2", value="Strike 2"),
+      app_commands.Choice(name="Removal", value="Removal"),
+  ])
+  async def strike_set(self, interaction: discord.Interaction, member: discord.Member, status: app_commands.Choice[str], reason: str):
+    await self._process_strike_update(interaction, member, "set", reason, set_value=status.value)
 
 
 async def setup(bot: commands.Bot):

@@ -16,6 +16,8 @@ errors = 1500591818532978909
 progression = 1500590900902887575
 loa_logs_channel_id = 1549744181906247741
 loa_apps_channel_id = 1549863520693129336
+exp_tracker = 1551287423349166080
+strike_tracker = 1551287543280967881
 # Voice Channels IDs
 division_name = ""
 division_leader = ""

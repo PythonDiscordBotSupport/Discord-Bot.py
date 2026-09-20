@@ -9,7 +9,7 @@ import gspread
 from config import (
     errors,  # ID канала для логирования ошибок
     human_resources,  # ID роли HR
-    progression,  # ID канала для логов прогрессии (экспы)
+    xp_tracker,  # ID канала для логов прогрессии (экспы)
 )
 
 # ID вашей Google Таблицы
@@ -92,8 +92,8 @@ class XPCog(commands.Cog):
 
       worksheet.update_cell(row, 9, new_amount)
 
-      # Отправка лога в канал progression
-      log_channel = self.bot.get_channel(progression)
+      # Отправка лога в канал xp_tracker
+      log_channel = self.bot.get_channel(xp_tracker)
       if log_channel:
         log_embed = discord.Embed(
             title=title,
@@ -152,4 +152,4 @@ class XPCog(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(XPCog(bot))
-        
+    

@@ -4,9 +4,8 @@ import discord
 from discord.ext import commands
 from config import bot_token, errors, notifications
 
-# 1. Включаем message_content intent
-intents = discord.Intents.default()
-intents.message_content = True
+# 1. Включаем ВСЕ интенты (включая привилегированные)
+intents = discord.Intents.all()
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -123,4 +122,4 @@ async def on_ready():
 
 def start_bot():
     bot.run(bot_token)
-    
+        

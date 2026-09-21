@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 import discord
 from discord import app_commands
@@ -7,9 +8,9 @@ import gspread
 
 # Импорты из вашего конфига (config.py)
 from config import (
-    errors,         # ID канала для логирования ошибок
-    human_resources, # ID роли HR
-    strike_tracker,  # ID канала для логов страйков
+    errors,          # ID канала для логирования ошибок
+    human_resources,  # ID роли HR
+    strike_tracker,   # ID канала для логов страйков
 )
 
 # ID вашей Google Таблицы
@@ -42,11 +43,12 @@ class StrikeCog(commands.Cog):
       reason: str,
       set_value: str = None,
   ):
-    """Единая логика для обновления страйков в колонке J и отправки логов"""
+    """Единая асинхронная логика для таблицы, ЛС и логов"""
     await interaction.response.defer(ephemeral=True)
     user_id_str = str(member.id).strip()
 
-    try:
+    # Синхронная функция для работы с gspread, которую мы запустим в отдельном потоке
+    def update_google_sheet():
       scopes = [
           "https://www.googleapis.com/auth/spreadsheets",
           "https://www.googleapis.com/auth/drive"
@@ -58,8 +60,42 @@ class StrikeCog(commands.Cog):
       worksheet = sh.sheet1
 
       cell = worksheet.find(user_id_str, in_column=3)
-
       if not cell:
+        return None, None, None
+
+      row = cell.row
+      current_val_raw = worksheet.cell(row, 10).value
+      previous_amount = str(current_val_raw).strip() if current_val_raw and str(current_val_raw).strip() != "" else "None"
+
+      # Логика изменения страйков в колонке J (10)
+      if mode == "add":
+        if previous_amount in ["None", ""]:
+          new_amount = "Strike 1"
+        elif previous_amount == "Strike 1":
+          new_amount = "Strike 2"
+        elif previous_amount == "Strike 2":
+          new_amount = "Removal"
+        else:
+          new_amount = "Removal"
+      elif mode == "remove":
+        if previous_amount == "Removal":
+          new_amount = "Strike 2"
+        elif previous_amount == "Strike 2":
+          new_amount = "Strike 1"
+        else:
+          new_amount = ""
+      else:  # set
+        new_amount = set_value if set_value else ""
+
+      # Обновляем колонку J (10)
+      worksheet.update_cell(row, 10, new_amount)
+      return previous_amount, new_amount, row
+
+    try:
+      # Запускаем блокирующий gspread асинхронно через asyncio.to_thread
+      previous_amount, new_amount, row = await asyncio.to_thread(update_google_sheet)
+
+      if previous_amount is None:
         await interaction.followup.send(
             f"❌ User ID `{user_id_str}` not found in column C of the Google Sheet.",
             ephemeral=True,
@@ -71,75 +107,63 @@ class StrikeCog(commands.Cog):
           )
         return
 
-      row = cell.row
-      current_val_raw = worksheet.cell(row, 10).value
-      previous_amount = str(current_val_raw).strip() if current_val_raw and str(current_val_raw).strip() != "" else "None"
-
-      # Логика изменения страйков в колонке J (10) и параметры для логов
-      if mode == "add":
-        if previous_amount in ["None", ""]:
-          new_amount = "Strike 1"
-        elif previous_amount == "Strike 1":
-          new_amount = "Strike 2"
-        elif previous_amount == "Strike 2":
-          new_amount = "Removal"
-        else:
-          new_amount = "Removal"
-        title, color, action_text = "⚠️ Strike Added", discord.Color.red(), f"added a strike to"
-
-      elif mode == "remove":
-        if previous_amount == "Removal":
-          new_amount = "Strike 2"
-        elif previous_amount == "Strike 2":
-          new_amount = "Strike 1"
-        else:
-          new_amount = ""
-        title, color, action_text = "🛡️ Strike Removed", discord.Color.green(), f"removed a strike from"
-
-      else:  # set
-        new_amount = set_value if set_value else ""
-        title, color, action_text = "⚙️ Strike Status Set", discord.Color.blue(), f"set strike status for"
-
-      # Обновляем колонку J (10)
-      worksheet.update_cell(row, 10, new_amount)
       display_new = new_amount if new_amount != "" else "None"
       display_prev = previous_amount if previous_amount != "" else "None"
 
-      # Отправка лога в канал strike_tracker
+      # Определяем стиль логов в зависимости от мода
+      if mode == "add":
+        title, color, action_text = "⚠️ Strike Added", discord.Color.red(), "added a strike to"
+      elif mode == "remove":
+        title, color, action_text = "🛡️ Strike Removed", discord.Color.green(), "removed a strike from"
+      else:
+        title, color, action_text = "⚙️ Strike Status Set", discord.Color.blue(), "set strike status for"
+
+      # Подготавливаем эмбед для логов и ЛС
+      embed_data = {
+          "title": title,
+          "color": color,
+          "prev": display_prev,
+          "new": display_new,
+          "reason": reason
+      }
+
+      # Отправка лога в канал strike_tracker и ЛС пользователю параллельно (асинхронно)
       log_channel = self.bot.get_channel(strike_tracker)
-      if log_channel:
-        log_embed = discord.Embed(
-            title=title,
-            color=color,
-            timestamp=datetime.now(timezone.utc),
-        )
-        log_embed.add_field(name="Officer", value=member.mention, inline=False)
-        log_embed.add_field(name="Human Resources", value=interaction.user.mention, inline=False)
-        log_embed.add_field(name="New Status", value=display_new, inline=False)
-        log_embed.add_field(name="Previous Status", value=display_prev, inline=False)
-        log_embed.add_field(name="Reason", value=reason, inline=False)
-        
-        await log_channel.send(embed=log_embed)
+      
+      async def send_log():
+        if log_channel:
+          log_embed = discord.Embed(
+              title=embed_data["title"],
+              color=embed_data["color"],
+              timestamp=datetime.now(timezone.utc),
+          )
+          log_embed.add_field(name="Officer", value=member.mention, inline=False)
+          log_embed.add_field(name="Human Resources", value=interaction.user.mention, inline=False)
+          log_embed.add_field(name="New Status", value=embed_data["new"], inline=False)
+          log_embed.add_field(name="Previous Status", value=embed_data["prev"], inline=False)
+          log_embed.add_field(name="Reason", value=embed_data["reason"], inline=False)
+          await log_channel.send(embed=log_embed)
 
-      # Отправка личного сообщения пользователю (асинхронно с обработкой ошибок)
-      try:
-        dm_embed = discord.Embed(
-            title=title,
-            description=f"Your strike status has been updated in **{interaction.guild.name}**.",
-            color=color,
-            timestamp=datetime.now(timezone.utc),
-        )
-        dm_embed.add_field(name="New Status", value=display_new, inline=False)
-        dm_embed.add_field(name="Previous Status", value=display_prev, inline=False)
-        dm_embed.add_field(name="Reason", value=reason, inline=False)
-        dm_embed.set_footer(text=f"Action performed by HR team")
+      async def send_dm():
+        try:
+          dm_embed = discord.Embed(
+              title=embed_data["title"],
+              description=f"Your strike status has been updated in **{interaction.guild.name}**.",
+              color=embed_data["color"],
+              timestamp=datetime.now(timezone.utc),
+          )
+          dm_embed.add_field(name="New Status", value=embed_data["new"], inline=False)
+          dm_embed.add_field(name="Previous Status", value=embed_data["prev"], inline=False)
+          dm_embed.add_field(name="Reason", value=embed_data["reason"], inline=False)
+          dm_embed.set_footer(text="Action performed by HR team")
+          await member.send(embed=dm_embed)
+        except discord.Forbidden:
+          pass
+        except Exception as dm_error:
+          print(f"⚠️ Не удалось отправить ЛС пользователю {member.id}: {dm_error}")
 
-        await member.send(embed=dm_embed)
-      except discord.Forbidden:
-        # Если у пользователя закрыты ЛС или заблокирован бот
-        pass
-      except Exception as dm_error:
-        print(f"⚠️ Не удалось отправить ЛС пользователю {member.id}: {dm_error}")
+      # Выполняем отправку лога и ЛС одновременно
+      await asyncio.gather(send_log(), send_dm())
 
       msg = f"✅ Successfully {action_text} {member.mention}.\n📊 Previous: `{display_prev}` | New: `{display_new}`"
       await interaction.followup.send(msg, ephemeral=True)
@@ -188,4 +212,4 @@ class StrikeCog(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(StrikeCog(bot))
-    
+                       

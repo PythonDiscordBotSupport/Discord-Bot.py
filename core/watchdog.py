@@ -1,5 +1,6 @@
 import asyncio
 import aiohttp
+from datetime import datetime, timezone
 from discord.ext import commands
 from config import restart_token
 
@@ -8,69 +9,50 @@ class ConnectionWatchdog(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.disconnect_time = None
-        self.max_downtime = 600  # 10 минут в секундах
+        # Фиксируем время последнего пинга/события от Discord
+        self.last_seen = datetime.now(timezone.utc)
+        self.max_downtime = 600  # 10 минут
         self.watchdog_task = self.bot.loop.create_task(self.watchdog_loop())
 
     def cog_unload(self):
         self.watchdog_task.cancel()
 
+    # Обновляем время при любых активных событиях от шлюза
     @commands.Cog.listener()
-    async def on_disconnect(self):
-        # Срабатывает мгновенно при потере связи с Discord
-        if self.disconnect_time is None:
-            loop = asyncio.get_running_loop()
-            self.disconnect_time = loop.time()
-            print("⚠️ Соединение с Discord потеряно! Запущен отсчет времени...")
+    async def on_socket_raw_receive(self, msg):
+        self.last_seen = datetime.now(timezone.utc)
 
     @commands.Cog.listener()
     async def on_connect(self):
-        # Срабатывает при успешном восстановлении связи
-        if self.disconnect_time is not None:
-            print("🟢 Соединение восстановлено! Таймер сброшен.")
-            self.disconnect_time = None
+        self.last_seen = datetime.now(timezone.utc)
+        print("🟢 Соединение с Discord подтверждено (Watchdog сброшен).")
 
     async def watchdog_loop(self):
         await self.bot.wait_until_ready()
         print("🛡️ Connection Watchdog успешно запущен.")
 
         while not self.bot.is_closed():
-            await asyncio.sleep(30)  # Проверяем статус каждые 30 секунд
+            await asyncio.sleep(60)  две минуты проверяем
 
-            # Если disconnect_time не задан, значит, всё в порядке
-            if self.disconnect_time is None:
-                continue
+            now = datetime.now(timezone.utc)
+            downtime = (now - self.last_seen).total_seconds()
 
-            # Вычисляем время простоя
-            loop = asyncio.get_running_loop()
-            current_time = loop.time()
-            elapsed_downtime = current_time - self.disconnect_time
+            print(f"⏱️ Время без активности шлюза Discord: {int(downtime)} сек.")
 
-            print(
-                f"⏱️ Бот оффлайн уже {int(elapsed_downtime)} сек. (Лимит: {self.max_downtime} сек.)"
-            )
-
-            # Если лимит исчерпан
-            if elapsed_downtime >= self.max_downtime:
-                print(
-                    "🚨 Лимит простоя исчерпан! Отправка запроса на перезапуск Render..."
-                )
+            # Если бот не получал от Discord вообще никаких пакетов дольше лимита
+            if downtime >= self.max_downtime:
+                print("🚨 Шлюз завис! Отправка запроса на рестарт Render...")
                 try:
                     async with aiohttp.ClientSession() as session:
                         async with session.post(restart_token) as response:
                             if response.status == 200:
-                                print(
-                                    "🚀 Запрос на перезапуск успешно отправлен!"
-                                )
+                                print("🚀 Запрос на рестарт успешно отправлен!")
                             else:
-                                print(
-                                    f"❌ Ошибка при запросе рестарта. Статус: {response.status}"
-                                )
+                                print(f"❌ Ошибка рестарта: статус {response.status}")
                 except Exception as e:
-                    print(f"❌ Исключение при отправке запроса: {e}")
+                    print(f"❌ Исключение при запросе рестарта: {e}")
 
-                # Защита от спама запросами (ждем 2 минуты перед повторной попыткой, если рестарт завис)
-                await asyncio.sleep(120)
+                await asyncio.sleep(120)  # Пауза, чтобы не спамить рестартами
 
 
 async def setup(bot: commands.Bot):

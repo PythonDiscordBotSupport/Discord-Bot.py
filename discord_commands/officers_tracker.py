@@ -60,10 +60,7 @@ class OfficerStaffCog(commands.Cog):
   def _check_and_update_google_sheet(
       self, roblox_username: str, roblox_id: str, discord_id: str, department: str
   ) -> str:
-    """Проверяет таблицу: ищет существующий Discord ID, либо первую пустую строку сверху вниз.
-
-    Заполняет колонки от A до G (A-B: Roblox, C: Discord, G: Department).
-    """
+    """Проверяет таблицу: ищет существующий Discord ID, либо первую пустую строку сверху вниз."""
     try:
       scopes = [
           "https://www.googleapis.com/auth/spreadsheets",
@@ -88,7 +85,6 @@ class OfficerStaffCog(commands.Cog):
 
       if existing_cell:
         row = existing_cell.row
-        # Обновляем базовые данные и департамент (колонка G)
         worksheet.update_cell(row, 1, roblox_username)
         worksheet.update_cell(row, 2, str(roblox_id))
         worksheet.update_cell(row, 7, department)  # Столбец G
@@ -103,7 +99,6 @@ class OfficerStaffCog(commands.Cog):
           target_row = index + 1
           break
 
-      # Записываем данные: A (Username), B (Roblox ID), C (Discord ID), G (Department)
       worksheet.update_cell(target_row, 1, roblox_username)
       worksheet.update_cell(target_row, 2, str(roblox_id))
       worksheet.update_cell(target_row, 3, cleaned_discord_id)
@@ -118,10 +113,7 @@ class OfficerStaffCog(commands.Cog):
       raise e
 
   def _clear_google_sheet_row(self, discord_id: str) -> tuple[bool, str, str]:
-    """Ищет Discord ID в колонке C, очищает данные с A по J (колонка D ставит FALSE),
-
-    возвращает (found, roblox_username, roblox_id).
-    """
+    """Ищет Discord ID в колонке C, очищает данные с A по J (колонка D ставит FALSE)."""
     try:
       scopes = [
           "https://www.googleapis.com/auth/spreadsheets",
@@ -149,7 +141,6 @@ class OfficerStaffCog(commands.Cog):
       roblox_username = worksheet.cell(row, 1).value or "Unknown"
       roblox_id = worksheet.cell(row, 2).value or "Unknown"
 
-      # Очищаем ячейки от A до J, причем в D (индекс 3) ставим FALSE (чекбокс)
       row_data = ["", "", "", False, "", "", "", "", "", ""]
       worksheet.update(f"A{row}:J{row}", [row_data])
 
@@ -189,7 +180,6 @@ class OfficerStaffCog(commands.Cog):
       department: app_commands.Choice[str],
       reason: str,
   ):
-    # Проверка прав HR / Officer
     role = interaction.guild.get_role(human_resources)
     if not role or role not in interaction.user.roles:
       await interaction.response.send_message(
@@ -205,7 +195,6 @@ class OfficerStaffCog(commands.Cog):
     prog_channel = self.bot.get_channel(progression)
 
     try:
-      # 1. Получение данных из RoVer API
       data = await self._fetch_rover_data(guild_id, user_id)
 
       if not data or not data.get("robloxId"):
@@ -254,7 +243,6 @@ class OfficerStaffCog(commands.Cog):
       roblox_id = data.get("robloxId")
       roblox_username = data.get("cachedUsername", "Unknown")
 
-      # Запись в Google Таблицу
       sheet_status = await asyncio.to_thread(
           self._check_and_update_google_sheet,
           roblox_username,
@@ -263,7 +251,6 @@ class OfficerStaffCog(commands.Cog):
           department.value,
       )
 
-      # Отправка лога в progression канал
       if prog_channel:
         success_embed = discord.Embed(
             title="Officer Registration",
@@ -320,7 +307,6 @@ class OfficerStaffCog(commands.Cog):
   async def officer_remove(
       self, interaction: discord.Interaction, member: discord.Member, reason: str
   ):
-    # Проверка прав HR / Officer
     role = interaction.guild.get_role(human_resources)
     if not role or role not in interaction.user.roles:
       await interaction.response.send_message(
@@ -334,7 +320,6 @@ class OfficerStaffCog(commands.Cog):
     prog_channel = self.bot.get_channel(progression)
 
     try:
-      # Очищаем строку в таблице (A-J, колонка D = FALSE)
       found, roblox_username, roblox_id = await asyncio.to_thread(
           self._clear_google_sheet_row, discord_id_str
       )
@@ -342,12 +327,11 @@ class OfficerStaffCog(commands.Cog):
       if not found:
         await interaction.followup.send(
             f"⚠️ Could not find a record associated with {member.mention}"
-            f" (`{discord_id_str}`) in the spreadsheet.",
+            " (`{discord_id_str}`) in the spreadsheet.",
             ephemeral=True,
         )
         return
 
-      # Отправляем лог в progression канал
       if prog_channel:
         remove_embed = discord.Embed(
             title="Officer Removal",
@@ -394,24 +378,6 @@ class OfficerStaffCog(commands.Cog):
           f"❌ An error occurred while executing the command: `{e}`",
           ephemeral=True,
       )
-
-  @officer_group.error
-  @staticmethod
-  async def officer_error(
-      interaction: discord.Interaction, error: app_commands.AppCommandError
-  ):
-    error_channel = interaction.client.get_channel(errors)
-    if error_channel:
-      error_embed = discord.Embed(
-          title="⚠️ Command Error",
-          description=(
-              f"**Command:** `/officer`\n**User:** {interaction.user}"
-              f" (`{interaction.user.id}`)\n**Error:** ```python\n{error}\n```"
-          ),
-          color=discord.Color.red(),
-      )
-      await error_channel.send(embed=error_embed)
-    raise error
 
 
 async def setup(bot: commands.Bot):

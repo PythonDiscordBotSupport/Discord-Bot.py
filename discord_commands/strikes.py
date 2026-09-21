@@ -121,6 +121,26 @@ class StrikeCog(commands.Cog):
         
         await log_channel.send(embed=log_embed)
 
+      # Отправка личного сообщения пользователю (асинхронно с обработкой ошибок)
+      try:
+        dm_embed = discord.Embed(
+            title=title,
+            description=f"Your strike status has been updated in **{interaction.guild.name}**.",
+            color=color,
+            timestamp=datetime.now(timezone.utc),
+        )
+        dm_embed.add_field(name="New Status", value=display_new, inline=False)
+        dm_embed.add_field(name="Previous Status", value=display_prev, inline=False)
+        dm_embed.add_field(name="Reason", value=reason, inline=False)
+        dm_embed.set_footer(text=f"Action performed by HR team")
+
+        await member.send(embed=dm_embed)
+      except discord.Forbidden:
+        # Если у пользователя закрыты ЛС или заблокирован бот
+        pass
+      except Exception as dm_error:
+        print(f"⚠️ Не удалось отправить ЛС пользователю {member.id}: {dm_error}")
+
       msg = f"✅ Successfully {action_text} {member.mention}.\n📊 Previous: `{display_prev}` | New: `{display_new}`"
       await interaction.followup.send(msg, ephemeral=True)
 

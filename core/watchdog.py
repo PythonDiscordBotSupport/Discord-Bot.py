@@ -10,9 +10,6 @@ class ConnectionWatchdog(commands.Cog):
         self.bot = bot
         self.disconnect_time = None
         self.max_downtime = 600  # 10 минут в секундах
-        self.watchdog_task = self.bot.loop.create_type_safely(
-            self.watchdog_loop()
-        )  # или стандартный create_task
         self.watchdog_task = self.bot.loop.create_task(self.watchdog_loop())
 
     def cog_unload(self):

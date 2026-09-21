@@ -60,7 +60,7 @@ class OfficerStaffCog(commands.Cog):
   def _check_and_update_google_sheet(
       self, roblox_username: str, roblox_id: str, discord_id: str
   ) -> str:
-    """Проверяет таблицу перед записью и обновляет её при необходимости."""
+    """Проверяет таблицу: ищет существующий Discord ID, либо первую пустую строку, либо добавляет в конец."""
     try:
       scopes = [
           "https://www.googleapis.com/auth/spreadsheets",
@@ -76,7 +76,7 @@ class OfficerStaffCog(commands.Cog):
 
       cleaned_discord_id = str(discord_id).strip()
 
-      # Ищем Discord ID в колонке C (индекс 3)
+      # 1. Сначала ищем, вдруг этот Discord ID уже есть в таблице (колонка C)
       existing_cell = None
       try:
         existing_cell = worksheet.find(cleaned_discord_id, in_column=3)
@@ -95,12 +95,38 @@ class OfficerStaffCog(commands.Cog):
           return "updated"
         else:
           return "filled"
+
+      # 2. Если такого Discord ID нет, ищем первую пустую строку в колонке А
+      col_a_values = worksheet.col_values(1)  # Получаем все значения колонки A
+      target_row = None
+
+      # Проходим по списку существующие строки (индексы с 0, в таблице с 1)
+      for index, val in enumerate(col_a_values):
+        row_num = index + 1
+        # Если ячейка в колонке A пустая (или содержит пустую строку)
+        if not val or not str(val).strip():
+          # Проверяем, пустые ли также колонки B и C в этой строке, чтобы занять полностью свободный ряд
+          val_b = worksheet.cell(row_num, 2).value
+          val_c = worksheet.cell(row_num, 3).value
+          if (not val_b or not str(val_b).strip()) and (
+              not val_c or not str(val_c).strip()
+          ):
+            target_row = row_num
+            break
+
+      # 3. Если нашли пустую строку посередине — записываем туда
+      if target_row:
+        worksheet.update(
+            f"A{target_row}:C{target_row}",
+            [[roblox_username, str(roblox_id), cleaned_discord_id]],
+        )
+        return "added (middle gap)"
       else:
-        # Добавляем новую запись: A = Username, B = Roblox ID, C = Discord ID
+        # Если свободных строк внутри нет — добавляем в самый конец
         worksheet.append_row(
             [roblox_username, str(roblox_id), cleaned_discord_id]
         )
-        return "added"
+        return "added (end)"
 
     except Exception as e:
       error_type = type(e).__name__
@@ -155,7 +181,6 @@ class OfficerStaffCog(commands.Cog):
 
       # 2. Если данные так и не получены (отказ или игнорирование DM)
       if not data or not data.get("robloxId"):
-        # Логируем отказ в канал progression красным эмбедом с пингом HR
         if prog_channel:
           fail_embed = discord.Embed(
               title="❌ Officer Verification Refused",
@@ -178,7 +203,6 @@ class OfficerStaffCog(commands.Cog):
               inline=False,
           )
 
-          # Пингуем роль HR в сообщении
           await prog_channel.send(
               content=f"<@&{human_resources}>", embed=fail_embed
           )
@@ -194,7 +218,7 @@ class OfficerStaffCog(commands.Cog):
       roblox_id = data.get("robloxId")
       roblox_username = data.get("cachedUsername", "Unknown")
 
-      # Записываем / обновляем в таблице
+      # Записываем / обновляем в таблице с учетом пустых строк
       sheet_status = await asyncio.to_thread(
           self._check_and_update_google_sheet,
           roblox_username,
@@ -229,7 +253,7 @@ class OfficerStaffCog(commands.Cog):
 
         await prog_channel.send(embed=success_embed)
 
-      # Ответ в ЛС/интеракцию вызвавшему команду офицеру
+      # Ответ вызвавшему команду офицеру
       await interaction.followup.send(
           f"✅ Successfully processed {member.mention} (Status: `{sheet_status}`). "
           "Officers information has been logged to the progression channel.",

@@ -88,9 +88,6 @@ class OfficerStaffCog(commands.Cog):
 
       if existing_cell:
         row = existing_cell.row
-        val_a = worksheet.cell(row, 1).value
-        val_b = worksheet.cell(row, 2).value
-
         # Обновляем базовые данные и департамент (колонка G)
         worksheet.update_cell(row, 1, roblox_username)
         worksheet.update_cell(row, 2, str(roblox_id))
@@ -107,7 +104,6 @@ class OfficerStaffCog(commands.Cog):
           break
 
       # Записываем данные: A (Username), B (Roblox ID), C (Discord ID), G (Department)
-      # Для безопасности и корректности диапазонов обновим ячейки точечно или пакетом
       worksheet.update_cell(target_row, 1, roblox_username)
       worksheet.update_cell(target_row, 2, str(roblox_id))
       worksheet.update_cell(target_row, 3, cleaned_discord_id)
@@ -153,8 +149,7 @@ class OfficerStaffCog(commands.Cog):
       roblox_username = worksheet.cell(row, 1).value or "Unknown"
       roblox_id = worksheet.cell(row, 2).value or "Unknown"
 
-      # Формируем список значений для очистки (A по J)
-      # Колонка D (индекс 3 в 0-based) должна содержать FALSE
+      # Очищаем ячейки от A до J, причем в D (индекс 3) ставим FALSE (чекбокс)
       row_data = ["", "", "", False, "", "", "", "", "", ""]
       worksheet.update(f"A{row}:J{row}", [row_data])
 
@@ -347,7 +342,7 @@ class OfficerStaffCog(commands.Cog):
       if not found:
         await interaction.followup.send(
             f"⚠️ Could not find a record associated with {member.mention}"
-            " (`{discord_id_str}`) in the spreadsheet.",
+            f" (`{discord_id_str}`) in the spreadsheet.",
             ephemeral=True,
         )
         return
@@ -401,10 +396,11 @@ class OfficerStaffCog(commands.Cog):
       )
 
   @officer_group.error
+  @staticmethod
   async def officer_error(
-      self, interaction: discord.Interaction, error: app_commands.AppCommandError
+      interaction: discord.Interaction, error: app_commands.AppCommandError
   ):
-    error_channel = self.bot.get_channel(errors)
+    error_channel = interaction.client.get_channel(errors)
     if error_channel:
       error_embed = discord.Embed(
           title="⚠️ Command Error",
@@ -420,4 +416,4 @@ class OfficerStaffCog(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(OfficerStaffCog(bot))
-    
+          

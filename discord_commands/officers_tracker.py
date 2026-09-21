@@ -168,9 +168,10 @@ class OfficerStaffCog(commands.Cog):
   @app_commands.choices(
       department=[
           app_commands.Choice(name="SIS", value="SIS"),
-          app_commands.Choice(name="FO", value="FO"),
+          app_commands.Choice(name="FOS", value="FOS"),
           app_commands.Choice(name="RAS", value="RAS"),
           app_commands.Choice(name="CMD", value="CMD"),
+          app_commands.Choice(name="TO", value="TO"),
       ]
   )
   async def officer_add(
@@ -382,4 +383,4 @@ class OfficerStaffCog(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(OfficerStaffCog(bot))
-          
+    

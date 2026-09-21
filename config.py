@@ -4,6 +4,7 @@ bot_token = os.environ.get("bot_token")
 cloud_api = os.environ.get("cloud_api")
 sheets_service_account = os.environ.get("service_account")
 restart_token = os.environ.get("restart_token")
+rover_token = os.environ.get("rover_token")
 # Permissions
 division_administrator = ""
 head_moderator = ""

@@ -32,7 +32,7 @@ class ConnectionWatchdog(commands.Cog):
         print("🛡️ Connection Watchdog успешно запущен.")
 
         while not self.bot.is_closed():
-            await asyncio.sleep(60)  две минуты проверяем
+            await asyncio.sleep(60) # две минуты проверяем
 
             now = datetime.now(timezone.utc)
             downtime = (now - self.last_seen).total_seconds()

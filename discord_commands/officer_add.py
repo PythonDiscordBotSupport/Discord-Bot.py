@@ -11,7 +11,6 @@ import gspread
 from config import (
     errors,  # ID канала для логирования ошибок
     human_resources,  # ID роли HR / Officer
-    progression,  # ID канала для логов прогрессии/офицеров
     rover_token,  # Ваш API-токен RoVer (начинается с rvr2)
 )
 
@@ -41,7 +40,9 @@ class OfficerStaffCog(commands.Cog):
           return None  # Пользователь не найден или скрыт из-за приватности
         else:
           text = await response.text()
-          raise Exception(f"RoVer API Error [{response.status}]: {text}")
+          raise Exception(
+              f"RoVer API Error [{response.status}]: {text}"
+          )
 
   async def _send_access_request(self, guild_id: int, user_id: int):
     """Отправляет запрос на доступ (DM) пользователю через RoVer API."""
@@ -50,17 +51,18 @@ class OfficerStaffCog(commands.Cog):
         "Authorization": f"Bearer {rover_token}",
         "Content-Type": "application/json",
     }
-
+    
     async with aiohttp.ClientSession() as session:
       async with session.put(url, headers=headers, json={}) as response:
+        # 201 Created или 200 OK означают успешную отправку или наличие статуса
         if response.status not in (200, 201):
           text = await response.text()
           print(f"⚠️ Не удалось отправить запрос доступа через RoVer: {text}")
 
-  def _check_and_update_google_sheet(
+  def _update_google_sheet_row(
       self, roblox_username: str, roblox_id: str, discord_id: str
-  ) -> str:
-    """Проверяет таблицу: ищет существующий Discord ID, либо первую пустую строку, либо добавляет в конец."""
+  ):
+    """Синхронно записывает данные в первую свободную строку таблицы (Колонки A, B, C)."""
     try:
       scopes = [
           "https://www.googleapis.com/auth/spreadsheets",
@@ -74,9 +76,11 @@ class OfficerStaffCog(commands.Cog):
       sh = gc.open_by_key(SPREADSHEET_ID)
       worksheet = sh.sheet1
 
+      # Находим первую свободную строку по колонке C (Discord ID) или A
+      # Либо просто добавляем в конец таблицы через append_row
       cleaned_discord_id = str(discord_id).strip()
-
-      # 1. Сначала ищем, вдруг этот Discord ID уже есть в таблице (колонка C)
+      
+      # Проверим, вдруг этот дискорд ID уже есть в таблице (колонка C - 3)
       existing_cell = None
       try:
         existing_cell = worksheet.find(cleaned_discord_id, in_column=3)
@@ -85,48 +89,13 @@ class OfficerStaffCog(commands.Cog):
 
       if existing_cell:
         row = existing_cell.row
-        val_a = worksheet.cell(row, 1).value
-        val_b = worksheet.cell(row, 2).value
-
-        # Если имя или ID не заполнены — дозаполняем
-        if not val_a or not val_b:
-          worksheet.update_cell(row, 1, roblox_username)
-          worksheet.update_cell(row, 2, str(roblox_id))
-          return "updated"
-        else:
-          return "filled"
-
-      # 2. Если такого Discord ID нет, ищем первую пустую строку в колонке А
-      col_a_values = worksheet.col_values(1)  # Получаем все значения колонки A
-      target_row = None
-
-      # Проходим по списку существующие строки (индексы с 0, в таблице с 1)
-      for index, val in enumerate(col_a_values):
-        row_num = index + 1
-        # Если ячейка в колонке A пустая (или содержит пустую строку)
-        if not val or not str(val).strip():
-          # Проверяем, пустые ли также колонки B и C в этой строке, чтобы занять полностью свободный ряд
-          val_b = worksheet.cell(row_num, 2).value
-          val_c = worksheet.cell(row_num, 3).value
-          if (not val_b or not str(val_b).strip()) and (
-              not val_c or not str(val_c).strip()
-          ):
-            target_row = row_num
-            break
-
-      # 3. Если нашли пустую строку посередине — записываем туда
-      if target_row:
-        worksheet.update(
-            f"A{target_row}:C{target_row}",
-            [[roblox_username, str(roblox_id), cleaned_discord_id]],
-        )
-        return "added (middle gap)"
+        worksheet.update_cell(row, 1, roblox_username)  # Колонка A
+        worksheet.update_cell(row, 2, str(roblox_id))   # Колонка B
+        print(f"🔄 Обновлена существующая строка {row} для Discord ID {cleaned_discord_id}")
       else:
-        # Если свободных строк внутри нет — добавляем в самый конец
-        worksheet.append_row(
-            [roblox_username, str(roblox_id), cleaned_discord_id]
-        )
-        return "added (end)"
+        # Ищем первую пустую строку или добавляем в конец
+        worksheet.append_row([roblox_username, str(roblox_id), cleaned_discord_id])
+        print(f"✅ Добавлена новая запись в таблицу для Discord ID {cleaned_discord_id}")
 
     except Exception as e:
       error_type = type(e).__name__
@@ -139,10 +108,8 @@ class OfficerStaffCog(commands.Cog):
       description="Officer management commands",
   )
   @app_commands.describe(member="The member to add/verify")
-  async def officer(
-      self, interaction: discord.Interaction, member: discord.Member
-  ):
-    # Проверка прав: доступно только роли Human Resources / Officer
+  async def officer(self, interaction: discord.Interaction, member: discord.Member):
+    # Проверка прав: использовать может только роль Human Resources / Officer
     role = interaction.guild.get_role(human_resources)
     if not role or role not in interaction.user.roles:
       await interaction.response.send_message(
@@ -154,125 +121,71 @@ class OfficerStaffCog(commands.Cog):
 
     guild_id = interaction.guild.id
     user_id = member.id
-    discord_id_str = str(user_id)
-    prog_channel = self.bot.get_channel(progression)
 
     try:
-      # 1. Первый GET-запрос к RoVer
+      # 1. Первая попытка получить данные из RoVer
       data = await self._fetch_rover_data(guild_id, user_id)
 
-      # Если данные скрыты из-за приватности (вернулся 404)
+      # Если данные скрыты из-за приватности (вернулся 404 или пусто)
       if not data or not data.get("robloxId"):
         await interaction.followup.send(
-            f"🔒 Privacy settings prevent viewing {member.mention}'s Roblox"
-            " data. An access request has been sent to their DMs, please"
-            " wait 1 minute...",
+            f"🔒 Данные пользователя {member.mention} скрыты настройками приватности RoVer. "
+            f"Отправлен запрос на разрешение доступа в ЛС, ожидайте...",
             ephemeral=True,
         )
 
-        # Отправляем PUT-запрос для высылки DM пользователю
+        # Отправляем запрос на доступ через RoVer API
         await self._send_access_request(guild_id, user_id)
 
-        # Ожидаем ровно одну минуту
+        # Ждем 1 минуту (60 секунд)
         await asyncio.sleep(60)
 
-        # Повторный GET-запрос после ожидания
+        # Повторная проверка после ожидания
         data = await self._fetch_rover_data(guild_id, user_id)
 
-      # 2. Если данные так и не получены (отказ или игнорирование DM)
+      # Если после повторной проверки данные всё еще недоступны
       if not data or not data.get("robloxId"):
-        if prog_channel:
-          fail_embed = discord.Embed(
-              title="❌ Officer Verification Refused",
-              description=(
-                  f"{member.mention} (`{discord_id_str}`) refused or failed"
-                  " to provide read permissions for their Roblox account."
-              ),
-              color=discord.Color.red(),
-              timestamp=datetime.now(timezone.utc),
-          )
-          fail_embed.add_field(
-              name="Discord Mention", value=member.mention, inline=True
-          )
-          fail_embed.add_field(
-              name="Discord ID", value=f"`{discord_id_str}`", inline=True
-          )
-          fail_embed.add_field(
-              name="Human Resources",
-              value=interaction.user.mention,
-              inline=False,
-          )
-
-          await prog_channel.send(
-              content=f"<@&{human_resources}>", embed=fail_embed
-          )
-
         await interaction.followup.send(
-            f"❌ {member.mention} refused or failed to provide account access."
-            " Incident logged to the progression channel.",
+            f"❌ Не удалось получить Roblox-аккаунт пользователя {member.mention}. "
+            "Возможно, он не верифицирован в RoVer или проигнорировал запрос доступа в ЛС.",
             ephemeral=True,
         )
         return
 
-      # 3. Данные получены успешно
       roblox_id = data.get("robloxId")
+      # В ответе эндпоинта поле называется cachedUsername
       roblox_username = data.get("cachedUsername", "Unknown")
+      discord_id_str = str(user_id)
 
-      # Записываем / обновляем в таблице с учетом пустых строк
-      sheet_status = await asyncio.to_thread(
-          self._check_and_update_google_sheet,
+      # 2. Запись в Google Таблицу (выполняем синхронно в отдельном потоке, чтобы не морозить бота)
+      await asyncio.to_thread(
+          self._update_google_sheet_row,
           roblox_username,
           roblox_id,
           discord_id_str,
       )
 
-      # Отправляем зеленый лог-эмбед в progression канал
-      if prog_channel:
-        success_embed = discord.Embed(
-            title="Officers information",
-            color=discord.Color.green(),
-            timestamp=datetime.now(timezone.utc),
-        )
-        success_embed.add_field(
-            name="Roblox Username", value=f"`{roblox_username}`", inline=True
-        )
-        success_embed.add_field(
-            name="Roblox ID", value=f"`{roblox_id}`", inline=True
-        )
-        success_embed.add_field(
-            name="Discord Mention", value=member.mention, inline=True
-        )
-        success_embed.add_field(
-            name="Discord ID", value=f"`{discord_id_str}`", inline=True
-        )
-        success_embed.add_field(
-            name="Human Resources",
-            value=interaction.user.mention,
-            inline=False,
-        )
-
-        await prog_channel.send(embed=success_embed)
-
-      # Ответ вызвавшему команду офицеру
       await interaction.followup.send(
-          f"✅ Successfully processed {member.mention} (Status: `{sheet_status}`). "
-          "Officers information has been logged to the progression channel.",
+          f"✅ Успешно! Пользователь {member.mention} привязан:\n"
+          f"• **Roblox User:** `{roblox_username}`\n"
+          f"• **Roblox ID:** `{roblox_id}`\n"
+          f"• **Discord ID:** `{discord_id_str}`",
           ephemeral=True,
       )
 
     except Exception as e:
+      # Логируем ошибку в канал ошибок, если он настроен
       error_channel = self.bot.get_channel(errors)
       if error_channel:
         try:
           await error_channel.send(
-              f"🚨 **Error in `/officer` command:**\n```python\n{str(e)}\n```"
+              f"🚨 **Error in `/officer add` command:**\n```python\n{str(e)}\n```"
           )
         except Exception:
           pass
 
       await interaction.followup.send(
-          f"❌ An error occurred while executing the command: `{e}`",
-          ephemeral=True,
+          f"❌ Произошла ошибка при выполнении команды: `{e}`", ephemeral=True
       )
 
   @officer.error
@@ -295,4 +208,3 @@ class OfficerStaffCog(commands.Cog):
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(OfficerStaffCog(bot))
-    
